@@ -1,0 +1,18 @@
+{
+  "name": "specpilot-ai",
+  "version": "0.1.0",
+  "private": true,
+  "description": "SpecPilot AI monorepo for AI-guided visual PRD generation.",
+  "packageManager": "pnpm@9.15.4",
+  "scripts": {
+    "dev": "pnpm dev:backend",
+    "dev:backend": "pnpm --filter @specpilot/backend dev",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "pnpm -r lint"
+  },
+  "devDependencies": {
+    "turbo": "^2.3.3",
+    "typescript": "^5.7.3"
+  }
+}
