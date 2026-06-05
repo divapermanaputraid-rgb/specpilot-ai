@@ -1,0 +1,53 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum ProjectStatus {
+  DRAFT
+  INTERVIEWING
+  GENERATING_PRD
+  COMPLETED
+}
+
+model Project {
+  id        String   @id @default(uuid())
+  sessionId String   @unique
+  rawIdea   String
+  status    ProjectStatus @default(DRAFT)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  interviewAnswers InterviewAnswer[]
+  generatedPrd     GeneratedPrd?
+}
+
+model InterviewAnswer {
+  id             String   @id @default(uuid())
+  projectId      String
+  sequenceNumber Int
+  question       String
+  answer         String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, sequenceNumber])
+}
+
+model GeneratedPrd {
+  id        String   @id @default(uuid())
+  projectId String   @unique
+  sessionId String   @unique
+  content   String   @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}

@@ -1,0 +1,13 @@
+{
+  "/api/health/route": "app/api/health/route.js",
+  "/api/interview/answer/route": "app/api/interview/answer/route.js",
+  "/api/prd/[sessionId]/route": "app/api/prd/[sessionId]/route.js",
+  "/api/project/create/route": "app/api/project/create/route.js",
+  "/api/interview/question/route": "app/api/interview/question/route.js",
+  "/api/prd/generate/route": "app/api/prd/generate/route.js",
+  "/_not-found/page": "app/_not-found/page.js",
+  "/app/page": "app/app/page.js",
+  "/app/session/[sessionId]/page": "app/app/session/[sessionId]/page.js",
+  "/prd/[sessionId]/page": "app/prd/[sessionId]/page.js",
+  "/page": "app/page.js"
+}
