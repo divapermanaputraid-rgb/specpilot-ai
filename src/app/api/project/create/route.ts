@@ -3,8 +3,8 @@ import { z } from "zod";
 import { prisma } from "@/lib/db/prisma";
 
 const createProjectSchema = z.object({
-  session_id: z.string().uuid(),
-  raw_idea: z.string().min(20).max(2000),
+  sessionId: z.string().uuid(),
+  rawIdea: z.string().min(20).max(2000),
 });
 
 export async function POST(req: Request) {
@@ -19,27 +19,27 @@ export async function POST(req: Request) {
       );
     }
 
-    const { session_id, raw_idea } = result.data;
+    const { sessionId, rawIdea } = result.data;
 
     // Check mock mode
     if (process.env.AI_MODE === "mock" || !process.env.DATABASE_URL) {
       return NextResponse.json({
         success: true,
-        project_id: "mock-project-id",
+        projectId: "mock-project-id",
       });
     }
 
     const project = await prisma.project.create({
       data: {
-        sessionId: session_id,
-        rawIdea: raw_idea,
+        sessionId,
+        rawIdea,
         status: "INTERVIEWING",
       },
     });
 
     return NextResponse.json({
       success: true,
-      project_id: project.id,
+      projectId: project.id,
     });
   } catch (error) {
     console.error("Error creating project:", error);

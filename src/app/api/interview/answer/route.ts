@@ -3,9 +3,15 @@ import { z } from "zod";
 import { prisma } from "@/lib/db/prisma";
 
 const answerSchema = z.object({
-  session_id: z.string().uuid(),
+  sessionId: z.string().uuid(),
+  projectId: z.string(),
+  sequenceNumber: z.number().int(),
+  stage: z.string(),
   question: z.string(),
-  answer: z.string(),
+  aiReason: z.string().optional(),
+  selectedOption: z.string(),
+  answerValue: z.string(),
+  completenessScore: z.number().int(),
 });
 
 export async function POST(req: Request) {
@@ -20,7 +26,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const { session_id, question, answer } = result.data;
+    const { sessionId, question, answerValue, sequenceNumber } = result.data;
 
     // Check mock mode
     if (process.env.AI_MODE === "mock" || !process.env.DATABASE_URL) {
@@ -31,7 +37,7 @@ export async function POST(req: Request) {
 
     // Find project
     const project = await prisma.project.findUnique({
-      where: { sessionId: session_id },
+      where: { sessionId },
       include: { interviewAnswers: true },
     });
 
@@ -42,16 +48,13 @@ export async function POST(req: Request) {
       );
     }
 
-    // Calculate next sequence number
-    const nextSeq = project.interviewAnswers.length + 1;
-
     // Store answer
     await prisma.interviewAnswer.create({
       data: {
         projectId: project.id,
-        sequenceNumber: nextSeq,
+        sequenceNumber,
         question,
-        answer,
+        answer: answerValue,
       },
     });
 

@@ -2,8 +2,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 const questionSchema = z.object({
-  session_id: z.string().uuid(),
-  conversation_history: z.array(
+  sessionId: z.string().uuid(),
+  conversationHistory: z.array(
     z.object({
       role: z.enum(["user", "assistant"]),
       content: z.string(),
@@ -23,24 +23,24 @@ export async function POST(req: Request) {
       );
     }
 
-    const { session_id, conversation_history } = result.data;
+    const { sessionId, conversationHistory } = result.data;
 
     // Check mock mode
     if (process.env.AI_MODE === "mock" || (!process.env.GROQ_API_KEY && !process.env.OPENROUTER_API_KEY)) {
       // Mock logic: after 3 user messages, finish the interview.
-      const userMessageCount = conversation_history.filter(m => m.role === "user").length;
+      const userMessageCount = conversationHistory.filter(m => m.role === "user").length;
       
       if (userMessageCount >= 3) {
         return NextResponse.json({
           success: true,
-          is_complete: true,
+          isComplete: true,
         });
       }
 
       return NextResponse.json({
         success: true,
         question: "Could you tell me more about the specific features you want in your app?",
-        is_complete: false,
+        isComplete: false,
       });
     }
 
@@ -49,7 +49,7 @@ export async function POST(req: Request) {
     return NextResponse.json({
       success: true,
       question: "Could you tell me more about the specific features you want in your app?",
-      is_complete: false,
+      isComplete: false,
     });
   } catch (error) {
     console.error("Error getting interview question:", error);

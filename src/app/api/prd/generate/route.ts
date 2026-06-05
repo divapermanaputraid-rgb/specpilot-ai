@@ -3,7 +3,8 @@ import { z } from "zod";
 import { prisma } from "@/lib/db/prisma";
 
 const generateSchema = z.object({
-  session_id: z.string().uuid(),
+  sessionId: z.string().uuid(),
+  projectId: z.string().optional(),
 });
 
 export async function POST(req: Request) {
@@ -18,11 +19,11 @@ export async function POST(req: Request) {
       );
     }
 
-    const { session_id } = result.data;
+    const { sessionId, projectId } = result.data;
 
     // Check mock mode
     if (process.env.AI_MODE === "mock" || (!process.env.GROQ_API_KEY && !process.env.OPENROUTER_API_KEY)) {
-      const mockPrd = `# Mock PRD for Session ${session_id}
+      const mockPrd = `# Mock PRD for Session ${sessionId}
 
 ## 1. Product Overview
 This is a mock PRD generated because the system is in mock mode or AI keys are missing.
@@ -69,13 +70,13 @@ Copy and paste this section to an AI coding agent to start implementation.
 
       if (process.env.DATABASE_URL) {
         try {
-          const project = await prisma.project.findUnique({ where: { sessionId: session_id }});
+          const project = await prisma.project.findUnique({ where: { sessionId }});
           if (project) {
             await prisma.generatedPrd.upsert({
               where: { projectId: project.id },
               create: {
                 projectId: project.id,
-                sessionId: session_id,
+                sessionId,
                 content: mockPrd,
               },
               update: {
