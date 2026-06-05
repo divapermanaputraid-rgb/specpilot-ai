@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { interviewService } from "@/lib/services/interview.service";
 
 const questionSchema = z.object({
   sessionId: z.string().uuid(),
@@ -25,31 +26,14 @@ export async function POST(req: Request) {
 
     const { sessionId, conversationHistory } = result.data;
 
-    // Check mock mode
-    if (process.env.AI_MODE === "mock" || (!process.env.GROQ_API_KEY && !process.env.OPENROUTER_API_KEY)) {
-      // Mock logic: after 3 user messages, finish the interview.
-      const userMessageCount = conversationHistory.filter(m => m.role === "user").length;
-      
-      if (userMessageCount >= 3) {
-        return NextResponse.json({
-          success: true,
-          isComplete: true,
-        });
-      }
+    const aiResponse = await interviewService.generateNextQuestion(
+      conversationHistory.map(m => ({ role: m.role, content: m.content })),
+      sessionId
+    );
 
-      return NextResponse.json({
-        success: true,
-        question: "Could you tell me more about the specific features you want in your app?",
-        isComplete: false,
-      });
-    }
-
-    // TODO: Implement actual AI provider routing
-    // For now, return mock
     return NextResponse.json({
       success: true,
-      question: "Could you tell me more about the specific features you want in your app?",
-      isComplete: false,
+      ...aiResponse
     });
   } catch (error) {
     console.error("Error getting interview question:", error);

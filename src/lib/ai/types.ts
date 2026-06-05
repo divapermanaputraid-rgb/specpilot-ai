@@ -11,14 +11,24 @@ export interface AiInterviewResponse {
   completenessScore: number;
 }
 
+export type AiTask = "interview" | "prdGeneration" | "jsonRepair";
+
+export interface AiProviderConfig {
+  task: AiTask;
+  messages: AiMessage[];
+  temperature?: number;
+  maxTokens?: number;
+}
+
+export interface AiProviderResponse {
+  content: string;
+  providerUsed: string;
+  modelUsed: string;
+  tokensUsed?: number;
+}
+
 export interface AiProvider {
-  generateInterviewQuestion(
-    history: AiMessage[],
-    systemPrompt: string
-  ): Promise<AiInterviewResponse>;
-  
-  generatePrd(
-    history: AiMessage[],
-    systemPrompt: string
-  ): Promise<string>;
+  name: string;
+  isAvailable(): boolean;
+  generate(config: AiProviderConfig): Promise<AiProviderResponse>;
 }

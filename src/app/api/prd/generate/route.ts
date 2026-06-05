@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db/prisma";
+import { prdService } from "@/lib/services/prd.service";
+import { AiMessage } from "@/lib/ai/types";
 
 const generateSchema = z.object({
   sessionId: z.string().uuid(),
@@ -20,6 +22,25 @@ export async function POST(req: Request) {
     }
 
     const { sessionId, projectId } = result.data;
+
+    if (!process.env.DATABASE_URL) {
+      return NextResponse.json({
+         success: false,
+         error: "Database URL not configured"
+      }, { status: 500 });
+    }
+
+    const project = await prisma.project.findUnique({
+      where: { sessionId },
+      include: { interviewAnswers: true }
+    });
+
+    if (!project) {
+       return NextResponse.json({
+         success: false,
+         error: "Project not found for session"
+       }, { status: 404 });
+    }
 
     // Check mock mode
     if (process.env.AI_MODE === "mock" || (!process.env.GROQ_API_KEY && !process.env.OPENROUTER_API_KEY)) {
@@ -68,29 +89,24 @@ gantt
 Copy and paste this section to an AI coding agent to start implementation.
 `;
 
-      if (process.env.DATABASE_URL) {
-        try {
-          const project = await prisma.project.findUnique({ where: { sessionId }});
-          if (project) {
-            await prisma.generatedPrd.upsert({
-              where: { projectId: project.id },
-              create: {
-                projectId: project.id,
-                sessionId,
-                content: mockPrd,
-              },
-              update: {
-                content: mockPrd,
-              }
-            });
-            await prisma.project.update({
-              where: { id: project.id },
-              data: { status: "COMPLETED" }
-            });
+      try {
+        await prisma.generatedPrd.upsert({
+          where: { projectId: project.id },
+          create: {
+            projectId: project.id,
+            sessionId,
+            content: mockPrd,
+          },
+          update: {
+            content: mockPrd,
           }
-        } catch (e) {
-            console.error("Failed to save mock PRD to DB:", e)
-        }
+        });
+        await prisma.project.update({
+          where: { id: project.id },
+          data: { status: "COMPLETED" }
+        });
+      } catch (e) {
+          console.error("Failed to save mock PRD to DB:", e)
       }
 
       return NextResponse.json({
@@ -99,10 +115,56 @@ Copy and paste this section to an AI coding agent to start implementation.
       });
     }
 
-    // TODO: Implement actual PRD generation using AI provider routing and docs loading
+    // Actual PRD Generation
+    
+    // Construct interview history from DB
+    const interviewHistory: AiMessage[] = [];
+    
+    // We start with the initial idea
+    interviewHistory.push({
+      role: 'user',
+      content: `I want to build: ${project.rawIdea}`
+    });
+
+    // Add Q&A pairs
+    project.interviewAnswers.forEach(qa => {
+       interviewHistory.push({
+         role: 'assistant',
+         content: qa.question
+       });
+       interviewHistory.push({
+         role: 'user',
+         content: qa.answer
+       });
+    });
+
+    const aiResponse = await prdService.generatePrd(interviewHistory, project.id);
+
+    try {
+      await prisma.generatedPrd.upsert({
+        where: { projectId: project.id },
+        create: {
+          projectId: project.id,
+          sessionId,
+          content: aiResponse.content,
+        },
+        update: {
+          content: aiResponse.content,
+        }
+      });
+      await prisma.project.update({
+        where: { id: project.id },
+        data: { status: "COMPLETED" }
+      });
+    } catch (e) {
+        console.error("Failed to save AI PRD to DB:", e)
+    }
+
     return NextResponse.json({
         success: true,
-        prd: "# Live Mode PRD Placeholder\n\nAI PRD generation is not fully implemented yet.",
+        prd: aiResponse.content,
+        isValid: aiResponse.isValid,
+        validationErrors: aiResponse.validationErrors
     });
 
   } catch (error) {
