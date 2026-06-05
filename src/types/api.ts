@@ -1,43 +1,54 @@
 export interface CreateProjectRequest {
-  session_id: string;
-  raw_idea: string;
+  sessionId: string;
+  rawIdea: string;
 }
 
 export interface CreateProjectResponse {
   success: boolean;
-  project_id?: string;
+  projectId?: string;
   error?: string;
+  details?: any;
 }
 
 export interface InterviewQuestionRequest {
-  session_id: string;
-  conversation_history: Array<{ role: "user" | "assistant"; content: string }>;
+  sessionId: string;
+  conversationHistory: Array<{ role: "user" | "assistant"; content: string }>;
 }
 
 export interface InterviewQuestionResponse {
   success: boolean;
   question?: string;
-  is_complete?: boolean;
+  isComplete?: boolean;
   error?: string;
+  details?: any;
 }
 
 export interface InterviewAnswerRequest {
-  session_id: string;
+  sessionId: string;
+  projectId: string;
+  sequenceNumber: number;
+  stage: string;
   question: string;
-  answer: string;
+  aiReason?: string;
+  selectedOption: string;
+  answerValue: string;
+  completenessScore: number;
 }
 
 export interface InterviewAnswerResponse {
   success: boolean;
   error?: string;
+  details?: any;
 }
 
 export interface GeneratePrdRequest {
-  session_id: string;
+  sessionId: string;
+  projectId?: string;
 }
 
 export interface GeneratePrdResponse {
   success: boolean;
-  content?: string;
+  prd?: string;
   error?: string;
+  details?: any;
 }
