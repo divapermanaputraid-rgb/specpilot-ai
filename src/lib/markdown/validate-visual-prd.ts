@@ -18,17 +18,35 @@ export function validateVisualPrd(markdown: string): { isValid: boolean; errors:
     if (!markdown.match(/graph|flowchart/i)) {
       errors.push('Missing Flowchart diagram');
     }
-    if (!markdown.includes('erDiagram')) {
-      errors.push('Missing ER Diagram');
+    // ER diagram might be omitted if no database is needed, but should have explanation
+    if (!markdown.includes('erDiagram') && !markdown.match(/no database/i)) {
+      errors.push('Missing ER Diagram or explanation of no database');
     }
     if (!markdown.match(/gantt|journey/i)) {
       errors.push('Missing Gantt or Journey diagram');
+    }
+    if (!markdown.match(/pie/i)) {
+      errors.push('Missing Requirement Completeness pie chart');
     }
   }
 
   // Check for tables
   if (!markdown.includes('|')) {
      errors.push('Missing markdown tables (e.g., Feature Matrix or Risk Matrix)');
+  }
+
+  // Check for required sections based on PRD_TEMPLATE
+  const requiredSections = [
+    'Executive Summary',
+    'MVP Scope',
+    'Feature Requirements',
+    'AI Coding Agent Prompt'
+  ];
+
+  for (const section of requiredSections) {
+    if (!markdown.includes(section)) {
+      errors.push(`Missing required section: ${section}`);
+    }
   }
 
   return {

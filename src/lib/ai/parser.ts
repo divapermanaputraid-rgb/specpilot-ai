@@ -1,6 +1,7 @@
 import { AiInterviewResponse, AiMessage } from "./types";
 import { aiRouter } from "./provider-router";
 import { loadPrompt } from "../prompts/prompt-loader";
+import { z } from "zod";
 
 /**
  * Extracts JSON from a markdown string, handling potential code blocks
@@ -23,6 +24,14 @@ export function extractJsonFromMarkdown(text: string): string {
   return text.trim();
 }
 
+const aiResponseSchema = z.object({
+  question: z.string().min(1, "Question must not be empty"),
+  reason: z.string().optional(),
+  options: z.array(z.string()).optional(),
+  isComplete: z.boolean().default(false),
+  completenessScore: z.number().min(0).max(100).default(0),
+});
+
 /**
  * Validates and parses the AI interview response
  * Attempts to repair broken JSON using the repair model if parsing fails
@@ -35,23 +44,13 @@ export async function parseInterviewResponse(
   
   try {
     const parsed = JSON.parse(jsonString);
+    const result = aiResponseSchema.safeParse(parsed);
     
-    // Basic validation
-    if (!parsed.question || typeof parsed.question !== 'string') {
-      throw new Error("Missing or invalid 'question' field");
+    if (!result.success) {
+      throw new Error(`Zod validation failed: ${result.error.message}`);
     }
     
-    if (parsed.options && !Array.isArray(parsed.options)) {
-      throw new Error("'options' must be an array if provided");
-    }
-    
-    return {
-      question: parsed.question,
-      reason: parsed.reason,
-      options: parsed.options,
-      isComplete: !!parsed.isComplete,
-      completenessScore: typeof parsed.completenessScore === 'number' ? parsed.completenessScore : 0
-    };
+    return result.data;
   } catch (error) {
     console.warn("Failed to parse interview response, attempting repair", error);
     
@@ -71,13 +70,11 @@ export async function parseInterviewResponse(
       const repairedJsonString = extractJsonFromMarkdown(repairResponse.content);
       const repaired = JSON.parse(repairedJsonString);
       
-      return {
-        question: repaired.question || "I'm having trouble formulating my next question. Could you tell me more about the features?",
-        reason: repaired.reason || "JSON repair fallback",
-        options: Array.isArray(repaired.options) ? repaired.options : undefined,
-        isComplete: !!repaired.isComplete,
-        completenessScore: typeof repaired.completenessScore === 'number' ? repaired.completenessScore : 0
-      };
+      const result = aiResponseSchema.safeParse(repaired);
+      if (!result.success) {
+        throw new Error(`Repaired JSON validation failed: ${result.error.message}`);
+      }
+      return result.data;
     } catch (repairError) {
       console.error("JSON repair failed", repairError);
       // Fallback

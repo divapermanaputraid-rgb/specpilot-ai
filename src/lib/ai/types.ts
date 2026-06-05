@@ -9,6 +9,11 @@ export interface AiInterviewResponse {
   options?: string[];
   isComplete: boolean;
   completenessScore: number;
+  metadata?: {
+    provider: string;
+    model: string;
+    tokensUsed?: number;
+  };
 }
 
 export type AiTask = "interview" | "prdGeneration" | "jsonRepair";

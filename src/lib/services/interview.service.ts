@@ -34,8 +34,16 @@ export class InterviewService {
       });
 
       // 4. Parse and validate response
-      return await parseInterviewResponse(response.content, history);
+      const parsedResponse = await parseInterviewResponse(response.content, history);
       
+      return {
+        ...parsedResponse,
+        metadata: {
+          provider: response.providerUsed,
+          model: response.modelUsed,
+          tokensUsed: response.tokensUsed
+        }
+      };
     } catch (error) {
       console.error('Error generating next question:', error);
       throw new Error('Failed to generate interview question');
