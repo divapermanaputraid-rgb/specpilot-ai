@@ -1,26 +1,6 @@
-/**
- * API Client for SpecPilot AI
- */
-
-export interface CreateProjectInput {
-  sessionId: string;
-  rawIdea: string;
-}
-
-export interface CreateProjectResponse {
-  success: boolean;
-  projectId: string;
-  rawIdea: string;
-}
-
 export interface InterviewMessage {
   role: 'user' | 'assistant';
   content: string;
-}
-
-export interface GetInterviewQuestionInput {
-  sessionId: string;
-  conversationHistory?: InterviewMessage[];
 }
 
 export interface InterviewOption {
@@ -29,107 +9,134 @@ export interface InterviewOption {
 }
 
 export interface InterviewQuestionData {
-  status: 'asking' | 'ready_to_generate';
-  currentStage: string;
   question: string;
-  reason: string;
+  reason?: string;
   options: InterviewOption[];
-  allowCustom: boolean;
+  currentStage: string;
   completenessScore: number;
+  status: 'interviewing' | 'ready_to_generate';
+  allowCustom?: boolean;
 }
 
-export interface GetInterviewQuestionResponse {
+export interface AiInterviewResponse {
   success: boolean;
   data: InterviewQuestionData;
-  providerUsed?: string;
-  modelUsed?: string;
 }
 
-export interface SubmitInterviewAnswerInput {
+export interface SessionData {
+  id: string;
+  history: InterviewMessage[];
+  currentQuestion: InterviewQuestionData | null;
+  prd: string;
+}
+
+const API_BASE = '/api';
+
+export async function fetchQuestion(sessionId: string, history: InterviewMessage[]): Promise<InterviewQuestionData> {
+  const res = await fetch(`${API_BASE}/interview/question`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sessionId, conversationHistory: history }),
+  });
+  
+  const data = await res.json();
+  
+  if (!res.ok || !data.success) {
+    let errorMessage = 'Failed to fetch question';
+    if (data.error) {
+      if (typeof data.error === 'object' && data.error.message) {
+        errorMessage = `${data.error.message}${data.error.code ? ` (${data.error.code})` : ''}`;
+        if (data.error.debug) {
+          errorMessage += `\nDebug: ${data.error.debug}`;
+        }
+      } else {
+        errorMessage = data.error;
+      }
+    }
+    throw new Error(errorMessage);
+  }
+  
+  return data.data;
+}
+
+export async function submitAnswer(params: {
   sessionId: string;
   projectId: string;
   sequenceNumber: number;
   stage: string;
   question: string;
-  aiReason: string;
+  aiReason?: string;
   selectedOption: string;
   answerValue: string;
   completenessScore: number;
+}): Promise<void> {
+  const res = await fetch(`${API_BASE}/interview/answer`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params),
+  });
+  const data = await res.json();
+  if (!data.success) throw new Error(data.error || 'Failed to submit answer');
 }
 
-export interface SubmitInterviewAnswerResponse {
-  success: boolean;
-  completenessScore: number;
-  nextStep: string;
+export async function fetchPrd(sessionId: string): Promise<string> {
+  const res = await fetch(`${API_BASE}/prd/${sessionId}`);
+  const data = await res.json();
+  if (!data.success) return '';
+  return data.prd;
 }
 
-export interface GeneratePrdInput {
-  sessionId: string;
-  projectId?: string;
+export async function generatePrd(sessionId: string): Promise<string> {
+  const res = await fetch(`${API_BASE}/prd/generate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sessionId }),
+  });
+  const data = await res.json();
+  if (!data.success) throw new Error(data.error || 'Failed to generate PRD');
+  return data.prd;
 }
 
-export interface GeneratePrdResponse {
-  success: boolean;
-  projectId: string;
-  prd: string;
-}
-
-export interface GetPrdResponse {
-  success: boolean;
-  prd: string;
-}
-
-class ApiClient {
-  private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-    const response = await fetch(endpoint, {
-      ...options,
-      headers: {
-        'Content-Type': 'application/json',
-        ...options.headers,
-      },
+export const apiClient = {
+  async createProject(params: { sessionId: string; rawIdea: string }) {
+    const res = await fetch(`${API_BASE}/project/create`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params),
     });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error || `API request failed with status ${response.status}`);
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error || 'Failed to create project');
+    return data;
+  },
+  async getInterviewQuestion(params: { sessionId: string; conversationHistory: any[] }): Promise<InterviewQuestionData> {
+    return fetchQuestion(params.sessionId, params.conversationHistory);
+  },
+  async submitInterviewAnswer(params: any): Promise<void> {
+    return submitAnswer(params);
+  },
+  async getPrd(sessionId: string): Promise<string> {
+    return fetchPrd(sessionId);
+  },
+  fetchQuestion,
+  submitAnswer,
+  fetchPrd,
+  async generatePrd(params: { sessionId: string }): Promise<string> {
+    const res = await fetch(`${API_BASE}/prd/generate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId: params.sessionId }),
+    });
+    const data = await res.json();
+    
+    if (!data.success) {
+      if (typeof data.error === 'object' && data.error.code === 'PRD_QUALITY_VALIDATION_FAILED') {
+        const err = new Error(data.error.message || 'PRD failed quality validation');
+        (err as any).code = data.error.code;
+        (err as any).missing = data.error.missing;
+        throw err;
+      }
+      throw new Error(data.error || 'Failed to generate PRD');
     }
-
-    return response.json();
-  }
-
-  async createProject(input: CreateProjectInput): Promise<CreateProjectResponse> {
-    return this.request<CreateProjectResponse>('/api/project/create', {
-      method: 'POST',
-      body: JSON.stringify(input),
-    });
-  }
-
-  async getInterviewQuestion(input: GetInterviewQuestionInput): Promise<GetInterviewQuestionResponse> {
-    return this.request<GetInterviewQuestionResponse>('/api/interview/question', {
-      method: 'POST',
-      body: JSON.stringify(input),
-    });
-  }
-
-  async submitInterviewAnswer(input: SubmitInterviewAnswerInput): Promise<SubmitInterviewAnswerResponse> {
-    return this.request<SubmitInterviewAnswerResponse>('/api/interview/answer', {
-      method: 'POST',
-      body: JSON.stringify(input),
-    });
-  }
-
-  async generatePrd(input: GeneratePrdInput): Promise<GeneratePrdResponse> {
-    return this.request<GeneratePrdResponse>('/api/prd/generate', {
-      method: 'POST',
-      body: JSON.stringify(input),
-    });
-  }
-
-  async getPrd(sessionId: string): Promise<GetPrdResponse> {
-    return this.request<GetPrdResponse>(`/api/prd/${sessionId}`, {
-      method: 'GET',
-    });
-  }
-}
-
-export const apiClient = new ApiClient();
+    return data.prd;
+  },
+};

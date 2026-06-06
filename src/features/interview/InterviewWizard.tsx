@@ -15,15 +15,18 @@ function cn(...inputs: ClassValue[]) {
 
 interface InterviewWizardProps {
   sessionId: string;
+  onUpdatePrd?: (content: string) => void;
+  onUpdateGenerating?: (isGenerating: boolean) => void;
 }
 
-export function InterviewWizard({ sessionId }: InterviewWizardProps) {
+export function InterviewWizard({ sessionId, onUpdatePrd, onUpdateGenerating }: InterviewWizardProps) {
   const router = useRouter();
   
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [validationErrors, setValidationErrors] = useState<string[] | null>(null);
   
   const [data, setData] = useState<InterviewQuestionData | null>(null);
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
@@ -44,7 +47,7 @@ export function InterviewWizard({ sessionId }: InterviewWizardProps) {
         conversationHistory: [] // Keeping for compatibility as instructed
       });
       
-      setData(response.data);
+      setData(response);
     } catch (err: any) {
       console.error('Failed to fetch question:', err);
       setError(err.message || 'Failed to connect to AI. Please try again.');
@@ -77,28 +80,40 @@ export function InterviewWizard({ sessionId }: InterviewWizardProps) {
     setSubmitting(true);
     setError(null);
 
+    const optionIndex = data.options.findIndex(o => o.value === selectedOption);
+    const mappedSelectedOption = isCustom ? 'custom' : 
+                                  optionIndex === 0 ? 'option_a' :
+                                  optionIndex === 1 ? 'option_b' :
+                                  optionIndex === 2 ? 'option_c' : `option_${optionIndex + 1}`;
+
     const answerValue = isCustom 
       ? customAnswer 
       : data.options.find(o => o.value === selectedOption)?.label || '';
 
-    try {
-      await apiClient.submitInterviewAnswer({
-        sessionId,
-        projectId: sessionId, // Assuming project ID is the same as session ID for this demo, or handled by backend
-        sequenceNumber,
-        stage: data.currentStage,
-        question: data.question,
-        aiReason: data.reason,
-        selectedOption,
-        answerValue,
-        completenessScore: data.completenessScore,
-      });
+    const payload = {
+      sessionId,
+      projectId: sessionId,
+      sequenceNumber,
+      stage: data.currentStage,
+      question: data.question,
+      aiReason: data.reason || '',
+      selectedOption: mappedSelectedOption,
+      answerValue,
+      completenessScore: data.completenessScore,
+    };
 
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[InterviewWizard] Submitting answer:', payload);
+    }
+
+    try {
+      await apiClient.submitInterviewAnswer(payload);
       setSequenceNumber(prev => prev + 1);
       await fetchQuestion();
     } catch (err: any) {
       console.error('Failed to submit answer:', err);
       setError(err.message || 'Failed to submit your answer. Please try again.');
+    } finally {
       setSubmitting(false);
     }
   };
@@ -106,12 +121,18 @@ export function InterviewWizard({ sessionId }: InterviewWizardProps) {
   const handleGeneratePrd = async () => {
     setGenerating(true);
     setError(null);
+    setValidationErrors(null);
     try {
       await apiClient.generatePrd({ sessionId });
       router.push(`/prd/${sessionId}`);
     } catch (err: any) {
       console.error('Failed to generate PRD:', err);
-      setError(err.message || 'Failed to generate PRD. Please try again.');
+      if (err.code === 'PRD_QUALITY_VALIDATION_FAILED') {
+        setError("The model generated a PRD, but it did not meet SpecPilot's quality standard. Try generating again or use a stronger model.");
+        setValidationErrors(err.missing || []);
+      } else {
+        setError(err.message || 'Failed to generate PRD. Please try again.');
+      }
       setGenerating(false);
     }
   };
@@ -186,9 +207,22 @@ export function InterviewWizard({ sessionId }: InterviewWizardProps) {
         </div>
         
         {error && (
-          <div className="w-full p-5 rounded-2xl bg-destructive/10 border border-destructive/20 text-destructive text-sm font-bold flex items-center space-x-3">
-            <div className="h-2 w-2 rounded-full bg-destructive animate-ping" />
-            <span>{error}</span>
+          <div className="w-full space-y-4">
+            <div className="w-full p-5 rounded-2xl bg-destructive/10 border border-destructive/20 text-destructive text-sm font-bold flex items-center space-x-3">
+              <div className="h-2 w-2 rounded-full bg-destructive animate-ping" />
+              <span>{error}</span>
+            </div>
+            
+            {process.env.NODE_ENV === 'development' && validationErrors && validationErrors.length > 0 && (
+              <div className="w-full p-4 rounded-xl bg-muted border border-border text-left">
+                <p className="text-xs font-black uppercase tracking-widest text-muted-foreground mb-2">Missing Items (Dev Mode):</p>
+                <ul className="text-xs space-y-1 text-muted-foreground">
+                  {validationErrors.map((err, i) => (
+                    <li key={i}>• {err}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
         )}
 
@@ -199,7 +233,7 @@ export function InterviewWizard({ sessionId }: InterviewWizardProps) {
           >
             <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl" />
             <FileText className="mr-4 h-8 w-8" />
-            MANIFEST PRD
+            {error ? 'RETRY GENERATE' : 'MANIFEST PRD'}
           </button>
         )}
 

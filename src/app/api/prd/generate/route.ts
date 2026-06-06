@@ -43,7 +43,7 @@ export async function POST(req: Request) {
     }
 
     // Check mock mode
-    if (process.env.AI_MODE === "mock" || (!process.env.GROQ_API_KEY && !process.env.OPENROUTER_API_KEY)) {
+    if (process.env.AI_MODE === "mock") {
       const mockPrd = `# Mock PRD for Session ${sessionId}
 
 ## 1. Product Overview
@@ -138,7 +138,34 @@ Copy and paste this section to an AI coding agent to start implementation.
        });
     });
 
-    const aiResponse = await prdService.generatePrd(interviewHistory, project.id);
+    let aiResponse = await prdService.generatePrd(interviewHistory, project.id);
+
+    // If validation fails, run one retry/regeneration attempt
+    if (!aiResponse.isValid) {
+      console.log(`[PRD] First attempt failed validation. Retrying with feedback...`);
+      
+      aiResponse = await prdService.generatePrd(interviewHistory, project.id, aiResponse.validationErrors);
+    }
+
+    // If final validation still fails, return structured error
+    if (!aiResponse.isValid) {
+      return NextResponse.json({
+        success: false,
+        error: {
+          code: "PRD_QUALITY_VALIDATION_FAILED",
+          message: "Generated PRD did not meet the required quality standard.",
+          missing: aiResponse.validationErrors,
+          retryAttempted: true,
+          // Development-only metadata
+          ...(process.env.NODE_ENV === "development" ? {
+            generatedLength: aiResponse.content.length,
+            providerUsed: aiResponse.metadata?.provider,
+            modelUsed: aiResponse.metadata?.model,
+            prdPreview: aiResponse.content
+          } : {})
+        }
+      }, { status: 422 });
+    }
 
     try {
       await prisma.generatedPrd.upsert({
@@ -164,7 +191,9 @@ Copy and paste this section to an AI coding agent to start implementation.
         success: true,
         prd: aiResponse.content,
         isValid: aiResponse.isValid,
-        validationErrors: aiResponse.validationErrors
+        validationErrors: aiResponse.validationErrors,
+        providerUsed: aiResponse.metadata?.provider,
+        modelUsed: aiResponse.metadata?.model,
     });
 
   } catch (error) {

@@ -20,7 +20,7 @@ export function PrdViewer({ sessionId }: PrdViewerProps) {
     const fetchPrd = async () => {
       try {
         const response = await apiClient.getPrd(sessionId);
-        setContent(response.prd);
+        setContent(response);
       } catch (err: any) {
         console.error('Failed to fetch PRD:', err);
         setError(err.message || 'Could not load the PRD. It may have expired or the session ID is invalid.');

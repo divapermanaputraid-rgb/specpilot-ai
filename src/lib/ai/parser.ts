@@ -25,12 +25,35 @@ export function extractJsonFromMarkdown(text: string): string {
 }
 
 const aiResponseSchema = z.object({
+  status: z.enum(['asking', 'ready_to_generate']).default('asking'),
+  currentStage: z.string().default('Discovery'),
   question: z.string().min(1, "Question must not be empty"),
   reason: z.string().optional(),
-  options: z.array(z.string()).optional(),
-  isComplete: z.boolean().default(false),
+  options: z.array(
+    z.object({
+      label: z.string(),
+      value: z.string(),
+    })
+  ).default([]),
+  allowCustom: z.boolean().default(true),
   completenessScore: z.number().min(0).max(100).default(0),
 });
+
+/**
+ * Normalizes keys from snake_case to camelCase
+ */
+function normalizeKeys(obj: any): any {
+  if (Array.isArray(obj)) {
+    return obj.map(normalizeKeys);
+  } else if (obj !== null && typeof obj === 'object') {
+    return Object.keys(obj).reduce((acc: any, key) => {
+      const camelKey = key.replace(/_([a-z])/g, (g) => g[1].toUpperCase());
+      acc[camelKey] = normalizeKeys(obj[key]);
+      return acc;
+    }, {});
+  }
+  return obj;
+}
 
 /**
  * Validates and parses the AI interview response
@@ -43,7 +66,44 @@ export async function parseInterviewResponse(
   const jsonString = extractJsonFromMarkdown(rawText);
   
   try {
-    const parsed = JSON.parse(jsonString);
+    let parsed = JSON.parse(jsonString);
+    parsed = normalizeKeys(parsed);
+
+    // Ensure 4 options
+    if (parsed.options && Array.isArray(parsed.options)) {
+      if (parsed.options.length > 4) {
+        parsed.options = parsed.options.slice(0, 4);
+      }
+      // Ensure Custom option
+      const hasCustom = parsed.options.some((o: any) => 
+        o.value === 'custom' || o.label?.toLowerCase() === 'custom'
+      );
+      if (!hasCustom && parsed.options.length >= 1) {
+        parsed.options[parsed.options.length - 1] = { label: 'Custom', value: 'custom' };
+      } else if (!hasCustom) {
+        parsed.options.push({ label: 'Custom', value: 'custom' });
+      }
+      
+      // Ensure exactly 4
+      while (parsed.options.length < 4) {
+        if (parsed.options.length === 3) {
+          parsed.options.push({ label: 'Custom', value: 'custom' });
+        } else {
+          parsed.options.unshift({ label: 'More info needed', value: `more_${parsed.options.length}` });
+        }
+      }
+      
+      // Force last to be custom if not already
+      if (parsed.options[3].value !== 'custom') {
+        parsed.options[3] = { label: 'Custom', value: 'custom' };
+      }
+    }
+
+    // Clamp completenessScore
+    if (typeof parsed.completenessScore === 'number') {
+      parsed.completenessScore = Math.max(0, Math.min(100, parsed.completenessScore));
+    }
+
     const result = aiResponseSchema.safeParse(parsed);
     
     if (!result.success) {
@@ -79,9 +139,12 @@ export async function parseInterviewResponse(
       console.error("JSON repair failed", repairError);
       // Fallback
       return {
+        status: 'asking',
+        currentStage: 'Error Recovery',
         question: "I encountered an error processing that. Could you elaborate on your last point?",
         reason: "Parser failure",
-        isComplete: false,
+        options: [],
+        allowCustom: true,
         completenessScore: 0
       };
     }

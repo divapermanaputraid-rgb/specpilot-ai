@@ -41,23 +41,30 @@ export class MockProvider implements AiProvider {
     let responseObj;
     if (userMessageCount >= 3) {
       responseObj = {
+        status: 'ready_to_generate',
+        currentStage: 'Conclusion',
         question: "Thank you, I have all the information I need to generate the PRD.",
         reason: "Sufficient context gathered.",
-        isComplete: true,
+        options: [],
+        allowCustom: false,
         completenessScore: 100,
       };
     } else {
       responseObj = {
-        question: "Could you tell me more about the specific features you want in your app?",
-        reason: "Need to understand core features to create a complete PRD.",
+        status: 'asking',
+        currentStage: userMessageCount === 0 ? 'Project Discovery' : 'Feature Definition',
+        question: userMessageCount === 0 
+          ? "Welcome! Could you tell me more about the primary target audience for this project?"
+          : "Could you tell me more about the specific features you want in your app?",
+        reason: "Need to understand core audience and features to create a complete PRD.",
         options: [
-          "User Authentication",
-          "Data Dashboard",
-          "Payment Integration",
-          "Social Sharing",
+          { label: "B2B SaaS tool", value: "b2b_saas" },
+          { label: "Consumer Mobile App", value: "consumer_app" },
+          { label: "E-commerce Platform", value: "ecommerce" },
+          { label: "Internal Admin Tool", value: "admin_tool" }
         ],
-        isComplete: false,
-        completenessScore: Math.min(100, userMessageCount * 33),
+        allowCustom: true,
+        completenessScore: Math.min(100, (userMessageCount + 1) * 25),
       };
     }
 
@@ -120,9 +127,12 @@ Copy and paste this section to an AI coding agent to start implementation.
     
     if (lastMessage?.content.includes("question") || lastMessage?.content.includes("completenessScore")) {
        return JSON.stringify({
+         status: 'asking',
+         currentStage: 'Discovery',
          question: "Mock repaired question",
          reason: "Mock repaired reason",
-         isComplete: false,
+         options: [],
+         allowCustom: true,
          completenessScore: 50
        });
     }

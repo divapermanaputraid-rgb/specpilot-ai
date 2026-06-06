@@ -26,6 +26,10 @@ export async function POST(req: Request) {
 
     const { sessionId, conversationHistory } = result.data;
 
+    if (process.env.NODE_ENV === "development") {
+      console.log(`[API] /api/interview/question sessionId=${sessionId} historyCount=${conversationHistory?.length || 0}`);
+    }
+
     const aiResponse = await interviewService.generateNextQuestion(
       sessionId,
       conversationHistory?.map(m => ({ role: m.role as "user" | "assistant", content: m.content }))
@@ -33,12 +37,23 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       success: true,
-      ...aiResponse
+      data: aiResponse
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error getting interview question:", error);
+    
+    const isDev = process.env.NODE_ENV === "development";
+    const errorMessage = error.message || "Internal server error";
+    
     return NextResponse.json(
-      { success: false, error: "Internal server error" },
+      { 
+        success: false, 
+        error: isDev ? {
+          code: "INTERVIEW_GENERATION_FAILED",
+          message: errorMessage,
+          debug: error.stack
+        } : "Internal server error"
+      },
       { status: 500 }
     );
   }
