@@ -13,6 +13,7 @@ interface PrdViewerProps {
 
 export function PrdViewer({ sessionId }: PrdViewerProps) {
   const [content, setContent] = useState<string>('');
+  const [quality, setQuality] = useState<{ valid: boolean; missing: string[]; score: number } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -20,7 +21,8 @@ export function PrdViewer({ sessionId }: PrdViewerProps) {
     const fetchPrd = async () => {
       try {
         const response = await apiClient.getPrd(sessionId);
-        setContent(response);
+        setContent(response.prd);
+        setQuality(response.quality);
       } catch (err: any) {
         console.error('Failed to fetch PRD:', err);
         setError(err.message || 'Could not load the PRD. It may have expired or the session ID is invalid.');
@@ -69,6 +71,32 @@ export function PrdViewer({ sessionId }: PrdViewerProps) {
 
   return (
     <div className="w-full max-w-5xl mx-auto animate-in fade-in slide-in-from-bottom-8 duration-1000">
+      {quality && !quality.valid && (
+        <div className="mb-8 p-6 rounded-2xl border border-warning/20 bg-warning/5 backdrop-blur-sm animate-in fade-in slide-in-from-top-4 duration-500">
+          <div className="flex items-start gap-4">
+            <div className="h-10 w-10 rounded-full bg-warning/10 flex items-center justify-center shrink-0">
+              <FileWarning className="h-5 w-5 text-warning" />
+            </div>
+            <div className="space-y-2">
+              <h3 className="text-lg font-bold tracking-tight text-warning-foreground">Quality Check Notice</h3>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                This PRD was generated, but it missed some quality checks. Score: <span className="font-bold text-warning-foreground">{quality.score}/100</span>
+              </p>
+              {quality.missing.length > 0 && (
+                <ul className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1">
+                  {quality.missing.map((item, i) => (
+                    <li key={i} className="text-[11px] font-medium text-muted-foreground flex items-center">
+                      <span className="h-1 w-1 rounded-full bg-warning/40 mr-2 shrink-0" />
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="mb-12 sticky top-14 z-40 bg-background/80 backdrop-blur-xl py-6 px-4 md:px-8 -mx-4 md:-mx-8 border-b border-border/40 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div className="space-y-1">
           <div className="flex items-center space-x-2">

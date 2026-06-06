@@ -138,37 +138,35 @@ Copy and paste this section to an AI coding agent to start implementation.
        });
     });
 
+    const validationMode = process.env.PRD_VALIDATION_MODE || 'warning';
+
     let aiResponse = await prdService.generatePrd(interviewHistory, project.id);
 
-    // If validation fails, run one retry/regeneration attempt
-    if (!aiResponse.isValid) {
+    // If validation fails, run one retry/regeneration attempt (unless mode is 'off')
+    if (!aiResponse.isValid && validationMode !== 'off') {
       console.log(`[PRD] First attempt failed validation. Retrying with feedback...`);
-      
       aiResponse = await prdService.generatePrd(interviewHistory, project.id, aiResponse.validationErrors);
     }
 
-    // If final validation still fails, return structured error
-    if (!aiResponse.isValid) {
+    const quality = {
+      valid: aiResponse.isValid,
+      missing: aiResponse.validationErrors,
+      score: aiResponse.score
+    };
+
+    // Strict mode rejection
+    if (!aiResponse.isValid && validationMode === 'strict') {
       return NextResponse.json({
         success: false,
-        error: {
-          code: "PRD_QUALITY_VALIDATION_FAILED",
-          message: "Generated PRD did not meet the required quality standard.",
-          missing: aiResponse.validationErrors,
-          retryAttempted: true,
-          // Development-only metadata
-          ...(process.env.NODE_ENV === "development" ? {
-            generatedLength: aiResponse.content.length,
-            providerUsed: aiResponse.metadata?.provider,
-            modelUsed: aiResponse.metadata?.model,
-            prdPreview: aiResponse.content
-          } : {})
-        }
+        error: "Generated PRD did not meet the required quality standard.",
+        quality
       }, { status: 422 });
     }
 
+    // Save PRD (unless strict and invalid, which is handled above)
+    let prdRecord;
     try {
-      await prisma.generatedPrd.upsert({
+      prdRecord = await prisma.generatedPrd.upsert({
         where: { projectId: project.id },
         create: {
           projectId: project.id,
@@ -184,16 +182,16 @@ Copy and paste this section to an AI coding agent to start implementation.
         data: { status: "COMPLETED" }
       });
     } catch (e) {
-        console.error("Failed to save AI PRD to DB:", e)
+      console.error("Failed to save AI PRD to DB:", e);
     }
 
     return NextResponse.json({
-        success: true,
-        prd: aiResponse.content,
-        isValid: aiResponse.isValid,
-        validationErrors: aiResponse.validationErrors,
-        providerUsed: aiResponse.metadata?.provider,
-        modelUsed: aiResponse.metadata?.model,
+      success: true,
+      prdId: prdRecord?.id,
+      markdownContent: aiResponse.content,
+      providerUsed: aiResponse.metadata?.provider,
+      modelUsed: aiResponse.metadata?.model,
+      quality
     });
 
   } catch (error) {

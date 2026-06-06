@@ -28,6 +28,11 @@ export interface SessionData {
   history: InterviewMessage[];
   currentQuestion: InterviewQuestionData | null;
   prd: string;
+  quality?: {
+    valid: boolean;
+    missing: string[];
+    score: number;
+  } | null;
 }
 
 const API_BASE = '/api';
@@ -79,22 +84,35 @@ export async function submitAnswer(params: {
   if (!data.success) throw new Error(data.error || 'Failed to submit answer');
 }
 
-export async function fetchPrd(sessionId: string): Promise<string> {
+export async function fetchPrd(sessionId: string): Promise<{ prd: string; quality?: any }> {
   const res = await fetch(`${API_BASE}/prd/${sessionId}`);
   const data = await res.json();
-  if (!data.success) return '';
-  return data.prd;
+  if (!data.success) return { prd: '' };
+  return { prd: data.prd, quality: data.quality };
 }
 
-export async function generatePrd(sessionId: string): Promise<string> {
+export async function generatePrd(sessionId: string): Promise<{ prd: string; quality?: any }> {
   const res = await fetch(`${API_BASE}/prd/generate`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ sessionId }),
   });
   const data = await res.json();
-  if (!data.success) throw new Error(data.error || 'Failed to generate PRD');
-  return data.prd;
+  
+  if (!data.success) {
+    if (res.status === 422 && data.quality) {
+       const err = new Error(data.error || 'PRD failed quality validation');
+       (err as any).quality = data.quality;
+       (err as any).status = 422;
+       throw err;
+    }
+    throw new Error(data.error || 'Failed to generate PRD');
+  }
+  
+  return { 
+    prd: data.markdownContent || data.prd, 
+    quality: data.quality 
+  };
 }
 
 export const apiClient = {
@@ -114,29 +132,13 @@ export const apiClient = {
   async submitInterviewAnswer(params: any): Promise<void> {
     return submitAnswer(params);
   },
-  async getPrd(sessionId: string): Promise<string> {
+  async getPrd(sessionId: string): Promise<{ prd: string; quality?: any }> {
     return fetchPrd(sessionId);
   },
   fetchQuestion,
   submitAnswer,
   fetchPrd,
-  async generatePrd(params: { sessionId: string }): Promise<string> {
-    const res = await fetch(`${API_BASE}/prd/generate`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sessionId: params.sessionId }),
-    });
-    const data = await res.json();
-    
-    if (!data.success) {
-      if (typeof data.error === 'object' && data.error.code === 'PRD_QUALITY_VALIDATION_FAILED') {
-        const err = new Error(data.error.message || 'PRD failed quality validation');
-        (err as any).code = data.error.code;
-        (err as any).missing = data.error.missing;
-        throw err;
-      }
-      throw new Error(data.error || 'Failed to generate PRD');
-    }
-    return data.prd;
+  async generatePrd(params: { sessionId: string }): Promise<{ prd: string; quality?: any }> {
+    return generatePrd(params.sessionId);
   },
 };

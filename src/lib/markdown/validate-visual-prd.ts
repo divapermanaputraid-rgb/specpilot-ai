@@ -5,89 +5,98 @@
 export interface PrdValidationResult {
   valid: boolean;
   missing: string[];
+  score: number;
 }
 
 export function validateVisualPrd(markdown: string): PrdValidationResult {
   const missing: string[] = [];
+  const totalChecks = 11;
+  let passedChecks = 0;
 
-  // 1. Minimum markdown length
-  if (markdown.length < 12000) {
-    missing.push(`PRD too short (${markdown.length} chars). Minimum 12,000 required for full technical depth.`);
-  }
-
-  // 2. Headings count
-  const headings = markdown.match(/^##\s/gm);
-  if (!headings || headings.length < 20) {
-    missing.push(`Missing required depth. Found ${headings?.length || 0}/20 mandatory sections (## headings).`);
-  }
-
-  // 3. Mandatory Diagrams
-  if (!markdown.includes('```mermaid')) {
-    missing.push('Missing all Mermaid diagrams.');
+  // 1. Minimum markdown length: 4000 characters
+  if (markdown.length >= 4000) {
+    passedChecks++;
   } else {
-    if (!markdown.match(/graph|flowchart/i)) missing.push('Missing Mermaid flowchart (User Flow).');
-    if (!markdown.includes('erDiagram')) missing.push('Missing Mermaid erDiagram (Data Model).');
-    if (!markdown.includes('gantt')) missing.push('Missing Mermaid gantt (Timeline).');
+    missing.push(`PRD shorter than recommended (${markdown.length} chars).`);
   }
 
-  // 4. Tables and Specific Content counts
-  if (!markdown.toLowerCase().includes('success metrics')) missing.push('Missing Success Metrics table.');
-  
-  // Feature Matrix check (at least 10 rows)
-  const tableRows = markdown.match(/^\|.*\|$/gm) || [];
-  if (tableRows.length < 40) { // Roughly 10 features + other tables
-    missing.push('Missing Feature Requirements table with at least 10 detailed feature rows.');
+  // 2. at least 12 markdown headings
+  const headings = markdown.match(/^#+\s/gm);
+  if (headings && headings.length >= 12) {
+    passedChecks++;
+  } else {
+    missing.push(`Missing required depth. Found ${headings?.length || 0}/12 sections.`);
   }
 
-  // Acceptance Criteria count
-  const acItems = markdown.match(/^[*-]\s.*|\|.*\|/gm) || [];
-  if (!markdown.toLowerCase().includes('acceptance criteria')) {
-    missing.push('Missing Acceptance Criteria section.');
+  // 3. has Product Overview or Executive Summary
+  if (markdown.match(/##.*(Product Overview|Executive Summary)/i)) {
+    passedChecks++;
+  } else {
+    missing.push('Missing Product Overview or Executive Summary.');
   }
 
-  // User Stories count
-  const userStories = markdown.match(/as a.*i want to.*so that/gi) || [];
-  if (userStories.length < 8) {
-    missing.push(`Missing required user story depth. Found ${userStories.length}/8 user stories.`);
+  // 4. has Target Users
+  if (markdown.match(/##.*Target Users/i)) {
+    passedChecks++;
+  } else {
+    missing.push('Missing Target Users section.');
   }
 
-  // Risk Matrix check
-  if (!markdown.toLowerCase().includes('risk matrix') && !markdown.toLowerCase().includes('risks & mitigations')) {
-    missing.push('Missing Risk Matrix / Risks & Mitigations table.');
+  // 5. has MVP Scope
+  if (markdown.match(/##.*MVP Scope/i)) {
+    passedChecks++;
+  } else {
+    missing.push('Missing MVP Scope section.');
   }
 
-  // API Endpoints count
-  const apiMethods = markdown.match(/GET|POST|PUT|DELETE|PATCH/g) || [];
-  if (apiMethods.length < 5) {
-    missing.push(`Missing API design depth. Found ${apiMethods.length}/5 suggested endpoints.`);
+  // 6. has User Stories
+  if (markdown.match(/##.*User Stories/i) || markdown.match(/as a.*i want to.*so that/gi)) {
+    passedChecks++;
+  } else {
+    missing.push('Missing User Stories.');
   }
 
-  // AI Coding Agent Prompt length
-  const aiPromptSection = markdown.split(/##.*AI Coding Agent Prompt/i)[1];
-  if (!aiPromptSection || aiPromptSection.trim().length < 500) {
-    missing.push('Missing or too shallow AI Coding Agent Prompt (minimum 500 characters).');
+  // 7. has Feature Requirements or Feature Matrix
+  if (markdown.match(/##.*(Feature Requirements|Feature Matrix)/i)) {
+    passedChecks++;
+  } else {
+    missing.push('Missing Feature Requirements or Feature Matrix.');
   }
 
-  // 5. Required Sections Checklist (21 Sections)
-  const sections = [
-    'Executive Summary', 'Product Overview', 'Problem Statement', 'Target Users',
-    'Goals', 'Non-Goals', 'Success Metrics', 'MVP Scope', 'User Roles',
-    'User Stories', 'Main User Flow', 'Feature Requirements', 'Acceptance Criteria',
-    'Data Model', 'API Endpoint Suggestion', 'AI Feature Design',
-    'Tech Stack Recommendation', 'Timeline', 'Risks & Mitigations',
-    'Open Questions', 'AI Coding Agent Prompt'
-  ];
-
-  for (const section of sections) {
-    const regex = new RegExp(`##.*${section}`, 'i');
-    if (!regex.test(markdown)) {
-      missing.push(`Missing Section: ${section}`);
-    }
+  // 8. has Risks or Risks & Mitigations
+  if (markdown.match(/##.*(Risks|Risks & Mitigations)/i)) {
+    passedChecks++;
+  } else {
+    missing.push('Missing Risks or Risks & Mitigations.');
   }
+
+  // 9. has AI Coding Agent Prompt
+  if (markdown.match(/##.*AI Coding Agent Prompt/i)) {
+    passedChecks++;
+  } else {
+    missing.push('Missing AI Coding Agent Prompt.');
+  }
+
+  // 10. has at least one Mermaid block
+  if (markdown.includes('```mermaid')) {
+    passedChecks++;
+  } else {
+    missing.push('Missing Mermaid diagrams.');
+  }
+
+  // 11. has at least one Markdown table
+  if (markdown.match(/^\|.*\|$/gm)) {
+    passedChecks++;
+  } else {
+    missing.push('Missing Markdown tables.');
+  }
+
+  const score = Math.round((passedChecks / totalChecks) * 100);
 
   return {
     valid: missing.length === 0,
     missing,
+    score
   };
 }
 

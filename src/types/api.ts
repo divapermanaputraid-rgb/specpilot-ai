@@ -46,9 +46,19 @@ export interface GeneratePrdRequest {
   projectId?: string;
 }
 
+export interface PrdQuality {
+  valid: boolean;
+  missing: string[];
+  score: number;
+}
+
 export interface GeneratePrdResponse {
   success: boolean;
-  prd?: string;
+  prdId?: string;
+  markdownContent?: string;
+  providerUsed?: string;
+  modelUsed?: string;
+  quality?: PrdQuality;
   error?: string;
   details?: any;
 }

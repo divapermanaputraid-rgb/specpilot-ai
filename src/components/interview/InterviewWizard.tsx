@@ -48,7 +48,7 @@ export const InterviewWizard: React.FC = () => {
       ]);
       
       setCurrentQuestion(question);
-      setPrdContent(prd || "");
+      setPrdContent(prd?.prd || "");
     } catch (err) {
       console.error("Failed to load session", err);
     } finally {
@@ -104,7 +104,7 @@ export const InterviewWizard: React.FC = () => {
       ]);
 
       setCurrentQuestion(nextQuestion);
-      setPrdContent(updatedPrd);
+      setPrdContent(updatedPrd?.prd || "");
     } catch (err: any) {
       console.error("Submission failed", err);
       // Optional: show error toast or message

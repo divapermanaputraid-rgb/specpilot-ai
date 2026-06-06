@@ -30,9 +30,12 @@ export async function GET(
       );
     }
 
+    const quality = null;
+
     return NextResponse.json({
       success: true,
       prd: prd.content,
+      quality
     });
   } catch (error) {
     console.error("Error retrieving PRD:", error);

@@ -15,6 +15,7 @@ export class PrdService {
     content: string; 
     isValid: boolean; 
     validationErrors: string[];
+    score: number;
     metadata?: {
       provider: string;
       model: string;
@@ -63,15 +64,11 @@ Additional instructions:
       const formattedPrd = formatVisualPrd(response.content);
       const validation = validateVisualPrd(formattedPrd);
 
-      if (!validation.valid) {
-        console.warn(`PRD generation produced validation errors: ${validation.missing.join(', ')}`);
-        // We could implement a self-correction loop here
-      }
-
       return {
         content: formattedPrd,
         isValid: validation.valid,
         validationErrors: validation.missing,
+        score: validation.score,
         metadata: {
           provider: response.providerUsed,
           model: response.modelUsed,
