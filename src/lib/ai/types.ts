@@ -3,11 +3,18 @@ export interface AiMessage {
   content: string;
 }
 
+export interface AiInterviewOption {
+  label: string;
+  value: string;
+}
+
 export interface AiInterviewResponse {
+  status: 'asking' | 'ready_to_generate';
+  currentStage: string;
   question: string;
   reason?: string;
-  options?: string[];
-  isComplete: boolean;
+  options: AiInterviewOption[];
+  allowCustom: boolean;
   completenessScore: number;
   metadata?: {
     provider: string;

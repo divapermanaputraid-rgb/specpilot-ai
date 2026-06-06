@@ -32,3 +32,44 @@ export function interpolatePrompt(template: string, variables: Record<string, st
     return variables[key] !== undefined ? variables[key] : match;
   });
 }
+
+/**
+ * Specifically loads and builds the PRD generation prompt with all standards and context
+ */
+export async function loadPrdGenerationPrompt(): Promise<string> {
+  const baseTemplate = await loadPrompt('prd-generation-prompt.md');
+  
+  // Load context files
+  const standardsFiles = [
+    'OUTPUT_STANDARD.md',
+    'VISUAL_MARKDOWN_STANDARD.md'
+  ];
+  
+  const docsDir = path.join(process.cwd(), 'docs');
+  
+  const standardsContent = await Promise.all(
+    standardsFiles.map(f => fs.readFile(path.join(docsDir, f), 'utf-8'))
+  );
+  
+  const templateContent = await fs.readFile(path.join(docsDir, 'PRD_TEMPLATE.md'), 'utf-8');
+  
+  // Load examples (max 2)
+  const examplesDir = path.join(docsDir, 'examples');
+  let examplesText = 'No examples provided.';
+  try {
+    const exampleFiles = await fs.readdir(examplesDir);
+    const mds = exampleFiles.filter(f => f.endsWith('.md')).slice(0, 2);
+    const contents = await Promise.all(
+      mds.map(f => fs.readFile(path.join(examplesDir, f), 'utf-8'))
+    );
+    examplesText = contents.join('\n\n---\n\n');
+  } catch (e) {
+    // Ignore if directory missing
+  }
+
+  return interpolatePrompt(baseTemplate, {
+    standards: standardsContent.join('\n\n---\n\n'),
+    template: templateContent,
+    examples: examplesText
+  });
+}
