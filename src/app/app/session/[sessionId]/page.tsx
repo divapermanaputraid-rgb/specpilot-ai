@@ -1,3 +1,5 @@
+import { InterviewWizard } from '@/features/interview/InterviewWizard';
+
 export default async function SessionPage({
   params,
 }: {
@@ -6,10 +8,8 @@ export default async function SessionPage({
   const resolvedParams = await params;
   
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center p-24">
-      <h1 className="text-3xl font-bold">Interview Session</h1>
-      <p className="mt-4">Session ID: {resolvedParams.sessionId}</p>
-      {/* TODO: Implement chat interface */}
-    </main>
+    <div className="flex flex-col items-center pt-16 pb-12 px-4 md:px-6">
+      <InterviewWizard sessionId={resolvedParams.sessionId} />
+    </div>
   );
 }

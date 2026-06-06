@@ -2,38 +2,78 @@ import { aiRouter } from "../ai/provider-router";
 import { parseInterviewResponse } from "../ai/parser";
 import { AiMessage, AiInterviewResponse } from "../ai/types";
 import { loadPrompt, interpolatePrompt } from "../prompts/prompt-loader";
+import { prisma } from "../db/prisma";
 
 export class InterviewService {
   /**
-   * Processes a user message and generates the next interview question
+   * Processes a user session and generates the next interview question
    */
   async generateNextQuestion(
-    history: AiMessage[],
-    projectId: string
+    sessionId: string,
+    providedHistory?: { role: "user" | "assistant"; content: string }[]
   ): Promise<AiInterviewResponse> {
     try {
-      // 1. Load system prompt
-      const systemPromptTemplate = await loadPrompt('interview-system-prompt.md');
-      
-      // We could fetch project details here to interpolate into the prompt
-      // const project = await db.project.findUnique({ where: { id: projectId } });
-      const systemPrompt = interpolatePrompt(systemPromptTemplate, {
-         // projectIdea: project?.idea || "Unknown",
+      // Fetch project details and previous answers
+      const project = await prisma.project.findUnique({
+        where: { sessionId },
+        include: { 
+          interviewAnswers: {
+            orderBy: { sequenceNumber: 'asc' }
+          } 
+        }
       });
 
-      // 2. Prepare messages for AI
+      if (!project) {
+        throw new Error('Project not found for session');
+      }
+
+      // 1. Construct History
+      let history: AiMessage[] = providedHistory as AiMessage[] || [];
+      
+      if (!providedHistory || providedHistory.length === 0) {
+        history = [{ role: 'user', content: project.rawIdea }];
+        
+        for (const answer of project.interviewAnswers) {
+          history.push({ role: 'assistant', content: answer.question });
+          history.push({ role: 'user', content: answer.answer });
+        }
+      }
+
+      // 2. Load system prompt
+      const systemPromptTemplate = await loadPrompt('interview-system-prompt.md');
+      
+      const questionCount = project.interviewAnswers.length;
+      const currentCompletenessScore = Math.min(100, questionCount * 10); 
+      
+      const previousAnswersJson = JSON.stringify(
+        project.interviewAnswers.map(a => ({
+          question: a.question,
+          answer: a.answer
+        })),
+        null,
+        2
+      );
+
+      const systemPrompt = interpolatePrompt(systemPromptTemplate, {
+         RAW_IDEA: project.rawIdea,
+         PREVIOUS_ANSWERS_JSON: previousAnswersJson,
+         QUESTION_COUNT: questionCount.toString(),
+         CURRENT_COMPLETENESS_SCORE: currentCompletenessScore.toString()
+      });
+
+      // 3. Prepare messages for AI
       const messages: AiMessage[] = [
         { role: 'system', content: systemPrompt },
         ...history
       ];
 
-      // 3. Call AI Provider
+      // 4. Call AI Provider
       const response = await aiRouter.generate({
         task: 'interview',
         messages
       });
 
-      // 4. Parse and validate response
+      // 5. Parse and validate response
       const parsedResponse = await parseInterviewResponse(response.content, history);
       
       return {

@@ -12,7 +12,7 @@ export const interviewQuestionSchema = z.object({
       role: z.enum(["user", "assistant"]),
       content: z.string(),
     })
-  ),
+  ).optional(),
 });
 
 export const interviewAnswerSchema = z.object({

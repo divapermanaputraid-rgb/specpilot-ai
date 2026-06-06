@@ -9,7 +9,7 @@ const questionSchema = z.object({
       role: z.enum(["user", "assistant"]),
       content: z.string(),
     })
-  ),
+  ).optional(),
 });
 
 export async function POST(req: Request) {
@@ -27,8 +27,8 @@ export async function POST(req: Request) {
     const { sessionId, conversationHistory } = result.data;
 
     const aiResponse = await interviewService.generateNextQuestion(
-      conversationHistory.map(m => ({ role: m.role, content: m.content })),
-      sessionId
+      sessionId,
+      conversationHistory?.map(m => ({ role: m.role as "user" | "assistant", content: m.content }))
     );
 
     return NextResponse.json({
