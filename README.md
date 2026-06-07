@@ -33,8 +33,6 @@ SpecPilot AI is currently in MVP stage. The core flow is working, while provider
 ### Interview Flow
 ![SpecPilot AI Interview Flow](./assets/screenshots/interview-flow.png)
 
-### PRD Result
-![SpecPilot AI PRD Result](./assets/screenshots/prd-result.png)
 
 ## Requirements
 
