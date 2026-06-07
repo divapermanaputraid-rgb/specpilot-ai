@@ -1,23 +1,146 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { motion } from 'framer-motion';
-import { FileText, Download, Sparkles, Users, Target, CheckSquare, Table, AlertTriangle, Code } from 'lucide-react';
+import { FileText, Download, Sparkles, Users, Target, CheckSquare, Table, AlertTriangle, Code, Lock, CheckCircle2, Edit3 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { InterviewQuestionData } from '@/lib/api-client';
+import { InterviewAnswer } from './InterviewWizard';
 
 interface LivePrdPreviewProps {
   content: string;
   isGenerating?: boolean;
   sessionId?: string;
   completenessScore?: number;
+  answers?: InterviewAnswer[];
+  currentQuestion?: InterviewQuestionData | null;
+  currentStage?: string;
+  rawIdea?: string;
+}
+
+type SectionStatus = 'locked' | 'drafting' | 'captured' | 'ready';
+
+interface SectionState {
+  id: string;
+  title: string;
+  icon: React.ReactNode;
+  description: string;
+  status: SectionStatus;
+  content?: string;
+  unlockThreshold: number;
 }
 
 export const LivePrdPreview: React.FC<LivePrdPreviewProps> = ({ 
   content, 
   isGenerating,
   sessionId,
-  completenessScore = 0
+  completenessScore = 0,
+  answers = [],
+  currentQuestion,
+  currentStage,
+  rawIdea
 }) => {
   const hasContent = content && content.trim().length > 0;
+
+  // Add debug logging in development
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[LivePrdPreview props]', {
+      answersCount: answers.length,
+      completenessScore,
+      currentStage,
+      currentQuestionStatus: currentQuestion?.status
+    });
+  }
+
+  // Derive section states from interview progress
+  const sections = useMemo((): SectionState[] => {
+    const answersCount = answers.length;
+    const isReadyToGenerate = currentQuestion?.status === 'ready_to_generate' || completenessScore >= 85;
+
+    // Extract answer values for content preview
+    const answerValues = answers.map(a => a.answerValue);
+    
+    // Fallback unlock logic: use both completenessScore and answersCount
+    const isSectionUnlocked = (threshold: number, minAnswers: number) => {
+      return completenessScore >= threshold || answersCount >= minAnswers;
+    };
+    
+    return [
+      {
+        id: 'brief',
+        title: 'Product Brief',
+        icon: <FileText className="w-4 h-4" />,
+        description: 'Overview of the product idea and vision',
+        status: isSectionUnlocked(10, 1) ? 'captured' : 'locked',
+        content: rawIdea || answerValues[0] || undefined,
+        unlockThreshold: 10
+      },
+      {
+        id: 'problem',
+        title: 'Problem Statement & Goals',
+        icon: <Target className="w-4 h-4" />,
+        description: 'The problem being solved and key objectives',
+        status: isSectionUnlocked(20, 2) ? 'captured' : 'locked',
+        content: answerValues[1] || undefined,
+        unlockThreshold: 20
+      },
+      {
+        id: 'users',
+        title: 'Target Users',
+        icon: <Users className="w-4 h-4" />,
+        description: 'User personas and audience definition',
+        status: isSectionUnlocked(30, 3) ? 'captured' : 'locked',
+        content: answerValues[2] || undefined,
+        unlockThreshold: 30
+      },
+      {
+        id: 'scope',
+        title: 'MVP Scope',
+        icon: <CheckSquare className="w-4 h-4" />,
+        description: 'Core features for minimum viable product',
+        status: isSectionUnlocked(40, 4) ? 'captured' : 'locked',
+        content: answerValues[3] || undefined,
+        unlockThreshold: 40
+      },
+      {
+        id: 'stories',
+        title: 'User Stories',
+        icon: <FileText className="w-4 h-4" />,
+        description: 'Detailed user journeys and workflows',
+        status: isSectionUnlocked(55, 5) ? 'captured' : 'locked',
+        content: answerValues[4] || undefined,
+        unlockThreshold: 55
+      },
+      {
+        id: 'features',
+        title: 'Feature Matrix',
+        icon: <Table className="w-4 h-4" />,
+        description: 'Feature priority and complexity breakdown',
+        status: isSectionUnlocked(65, 6) ? 'captured' : 'locked',
+        content: answerValues[5] || undefined,
+        unlockThreshold: 65
+      },
+      {
+        id: 'risks',
+        title: 'Technical Risks',
+        icon: <AlertTriangle className="w-4 h-4" />,
+        description: 'Potential challenges and mitigation strategies',
+        status: isSectionUnlocked(75, 7) ? 'captured' : 'locked',
+        content: answerValues[6] || undefined,
+        unlockThreshold: 75
+      },
+      {
+        id: 'prompt',
+        title: 'AI Coding Agent Prompt',
+        icon: <Code className="w-4 h-4" />,
+        description: 'Implementation guidance for AI-assisted development',
+        status: isReadyToGenerate ? 'ready' : completenessScore >= 85 ? 'captured' : 'locked',
+        content: isReadyToGenerate ? 'Ready to generate comprehensive PRD' : undefined,
+        unlockThreshold: 85
+      }
+    ];
+  }, [completenessScore, answers, currentQuestion, rawIdea]);
+
+  const capturedCount = sections.filter(s => s.status === 'captured' || s.status === 'ready').length;
 
   return (
     <div className="flex flex-col h-full bg-white overflow-hidden">
@@ -72,101 +195,38 @@ export const LivePrdPreview: React.FC<LivePrdPreviewProps> = ({
                 <p className="text-sm text-zinc-600">Your PRD will appear here as you complete the interview</p>
               </div>
 
+              {/* Progress Summary */}
+              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-blue-900 font-medium">Captured Answers</span>
+                  <span className="text-blue-700 font-semibold">{capturedCount} / {sections.length}</span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-blue-900 font-medium">Completeness</span>
+                  <span className="text-blue-700 font-semibold">{completenessScore}%</span>
+                </div>
+                {currentQuestion?.status === 'ready_to_generate' && (
+                  <div className="pt-2 border-t border-blue-200">
+                    <div className="flex items-center gap-2 text-sm text-blue-900 font-medium">
+                      <CheckCircle2 className="w-4 h-4 text-blue-600" />
+                      <span>Ready to Generate PRD</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* Document Structure Preview */}
               <div className="space-y-6">
-                {/* Product Brief */}
-                <DocumentSection
-                  icon={<FileText className="w-4 h-4" />}
-                  title="Product Brief"
-                  description="Overview of the product idea and vision"
-                  isLocked={completenessScore < 10}
-                />
-
-                {/* Problem Statement */}
-                <DocumentSection
-                  icon={<Target className="w-4 h-4" />}
-                  title="Problem Statement & Goals"
-                  description="The problem being solved and key objectives"
-                  isLocked={completenessScore < 20}
-                />
-
-                {/* Target Users */}
-                <DocumentSection
-                  icon={<Users className="w-4 h-4" />}
-                  title="Target Users"
-                  description="User personas and audience definition"
-                  isLocked={completenessScore < 30}
-                />
-
-                {/* MVP Scope */}
-                <DocumentSection
-                  icon={<CheckSquare className="w-4 h-4" />}
-                  title="MVP Scope"
-                  description="Core features for minimum viable product"
-                  isLocked={completenessScore < 40}
-                />
-
-                {/* User Stories */}
-                <DocumentSection
-                  icon={<FileText className="w-4 h-4" />}
-                  title="User Stories"
-                  description="Detailed user journeys and workflows"
-                  isLocked={completenessScore < 50}
-                  preview={
-                    <div className="mt-3 p-4 bg-zinc-50 border border-zinc-200 rounded-lg">
-                      <div className="flex items-center gap-2 text-xs text-zinc-500 mb-2">
-                        <span>Flow diagram preview:</span>
-                      </div>
-                      <div className="text-xs font-mono text-zinc-400 space-y-1">
-                        <div>Idea → Interview → PRD → Build</div>
-                      </div>
-                    </div>
-                  }
-                />
-
-                {/* Feature Matrix */}
-                <DocumentSection
-                  icon={<Table className="w-4 h-4" />}
-                  title="Feature Matrix"
-                  description="Feature priority and complexity breakdown"
-                  isLocked={completenessScore < 60}
-                  preview={
-                    <div className="mt-3 overflow-hidden border border-zinc-200 rounded-lg">
-                      <table className="min-w-full text-xs">
-                        <thead className="bg-zinc-50 border-b border-zinc-200">
-                          <tr>
-                            <th className="px-3 py-2 text-left text-zinc-600 font-medium">Feature</th>
-                            <th className="px-3 py-2 text-left text-zinc-600 font-medium">Priority</th>
-                            <th className="px-3 py-2 text-left text-zinc-600 font-medium">Complexity</th>
-                          </tr>
-                        </thead>
-                        <tbody className="bg-white">
-                          <tr className="border-b border-zinc-100">
-                            <td className="px-3 py-2 text-zinc-400">Feature items will appear here</td>
-                            <td className="px-3 py-2 text-zinc-400">—</td>
-                            <td className="px-3 py-2 text-zinc-400">—</td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
-                  }
-                />
-
-                {/* Technical Risks */}
-                <DocumentSection
-                  icon={<AlertTriangle className="w-4 h-4" />}
-                  title="Technical Risks"
-                  description="Potential challenges and mitigation strategies"
-                  isLocked={completenessScore < 70}
-                />
-
-                {/* AI Coding Prompt */}
-                <DocumentSection
-                  icon={<Code className="w-4 h-4" />}
-                  title="AI Coding Agent Prompt"
-                  description="Implementation guidance for AI-assisted development"
-                  isLocked={completenessScore < 80}
-                />
+                {sections.map((section) => (
+                  <DocumentSection
+                    key={section.id}
+                    icon={section.icon}
+                    title={section.title}
+                    description={section.description}
+                    status={section.status}
+                    content={section.content}
+                  />
+                ))}
               </div>
 
               {/* Progress Indicator */}
@@ -219,34 +279,67 @@ interface DocumentSectionProps {
   icon: React.ReactNode;
   title: string;
   description: string;
-  isLocked: boolean;
-  preview?: React.ReactNode;
+  status: SectionStatus;
+  content?: string;
 }
 
 const DocumentSection: React.FC<DocumentSectionProps> = ({ 
   icon, 
   title, 
   description, 
-  isLocked,
-  preview 
+  status,
+  content 
 }) => {
+  const isLocked = status === 'locked';
+  const isCaptured = status === 'captured' || status === 'ready';
+  
+  const statusConfig = {
+    locked: { label: 'Locked', icon: <Lock className="w-3 h-3" />, bg: 'bg-zinc-100', text: 'text-zinc-500', border: 'border-zinc-200' },
+    drafting: { label: 'Drafting', icon: <Edit3 className="w-3 h-3" />, bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200' },
+    captured: { label: 'Captured', icon: <CheckCircle2 className="w-3 h-3" />, bg: 'bg-green-50', text: 'text-green-700', border: 'border-green-200' },
+    ready: { label: 'Ready', icon: <CheckCircle2 className="w-3 h-3" />, bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200' },
+  };
+
+  const config = statusConfig[status];
+
   return (
-    <div className={`space-y-2 ${isLocked ? 'opacity-50' : ''}`}>
+    <div className={`space-y-2 transition-opacity duration-300 ${isLocked ? 'opacity-40' : 'opacity-100'}`}>
       <div className="flex items-start gap-3">
-        <div className={`p-2 rounded-lg border ${isLocked ? 'bg-zinc-50 border-zinc-200 text-zinc-400' : 'bg-blue-50 border-blue-200 text-blue-600'}`}>
+        <div className={`p-2 rounded-lg border transition-colors ${
+          isLocked 
+            ? 'bg-zinc-50 border-zinc-200 text-zinc-400' 
+            : 'bg-blue-50 border-blue-200 text-blue-600'
+        }`}>
           {icon}
         </div>
         <div className="flex-1">
-          <h3 className="text-base font-semibold text-zinc-900 flex items-center gap-2">
-            {title}
-            {isLocked && (
-              <span className="text-xs font-normal text-zinc-400 bg-zinc-100 px-2 py-0.5 rounded-full">
-                Locked
-              </span>
-            )}
-          </h3>
-          <p className="text-sm text-zinc-600 mt-1">{description}</p>
-          {preview && !isLocked && preview}
+          <div className="flex items-center gap-2 mb-1">
+            <h3 className="text-base font-semibold text-zinc-900">
+              {title}
+            </h3>
+            <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${config.bg} ${config.text} border ${config.border}`}>
+              {config.icon}
+              {config.label}
+            </span>
+          </div>
+          <p className="text-sm text-zinc-600">{description}</p>
+          
+          {/* Show captured content preview */}
+          {isCaptured && content && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              className="mt-3 p-3 bg-zinc-50 border border-zinc-200 rounded-lg"
+            >
+              <div className="flex items-center gap-2 text-xs text-zinc-500 mb-2">
+                <Sparkles className="w-3 h-3" />
+                <span className="font-medium">Preview</span>
+              </div>
+              <p className="text-sm text-zinc-700 line-clamp-3">
+                {content}
+              </p>
+            </motion.div>
+          )}
         </div>
       </div>
     </div>

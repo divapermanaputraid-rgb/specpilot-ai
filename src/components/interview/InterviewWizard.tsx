@@ -18,16 +18,26 @@ import { Textarea } from '@/components/ui/textarea';
 import { Loader2, ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
+export interface InterviewAnswer {
+  stage: string;
+  question: string;
+  answerValue: string;
+  selectedOption: string;
+  completenessScore: number;
+}
+
 export const InterviewWizard: React.FC = () => {
   const { sessionId } = useParams() as { sessionId: string };
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [history, setHistory] = useState<InterviewMessage[]>([]);
+  const [answers, setAnswers] = useState<InterviewAnswer[]>([]);
   const [currentQuestion, setCurrentQuestion] = useState<InterviewQuestionData | null>(null);
   const [prdContent, setPrdContent] = useState("");
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
   const [customAnswer, setCustomAnswer] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [rawIdea, setRawIdea] = useState<string>("");
   
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -42,6 +52,12 @@ export const InterviewWizard: React.FC = () => {
       
       setCurrentQuestion(question);
       setPrdContent(prd?.prd || "");
+      
+      // Try to extract raw idea from session storage or first question context
+      const storedIdea = sessionStorage.getItem(`project_idea_${sessionId}`);
+      if (storedIdea) {
+        setRawIdea(storedIdea);
+      }
     } catch (err) {
       console.error("Failed to load session", err);
       setError("Failed to load interview session. Please try again.");
@@ -111,6 +127,20 @@ export const InterviewWizard: React.FC = () => {
       // Submit answer to backend
       await submitAnswer(payload);
 
+      // Immediately add to answers array for live preview
+      const newAnswer: InterviewAnswer = {
+        stage: currentQuestion.currentStage,
+        question: currentQuestion.question,
+        answerValue: textToSend,
+        selectedOption: mappedSelectedOption,
+        completenessScore: currentQuestion.completenessScore || 10,
+      };
+      setAnswers((prev) => [...prev, newAnswer]);
+
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[InterviewWizard] Answer captured:', newAnswer);
+      }
+
       // Get next question and trigger PRD generation
       const [nextQuestion, updatedPrd] = await Promise.all([
         fetchQuestion(sessionId, newHistory),
@@ -119,6 +149,14 @@ export const InterviewWizard: React.FC = () => {
 
       setCurrentQuestion(nextQuestion);
       setPrdContent(updatedPrd?.prd || "");
+
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[InterviewWizard] Next question:', {
+          completenessScore: nextQuestion.completenessScore,
+          stage: nextQuestion.currentStage,
+          status: nextQuestion.status
+        });
+      }
     } catch (err: any) {
       console.error("Submission failed", err);
       setError("Failed to submit answer. Please try again.");
@@ -276,6 +314,10 @@ export const InterviewWizard: React.FC = () => {
           isGenerating={submitting}
           sessionId={sessionId}
           completenessScore={completenessScore}
+          answers={answers}
+          currentQuestion={currentQuestion}
+          currentStage={currentStage}
+          rawIdea={rawIdea}
         />
       </div>
     </div>

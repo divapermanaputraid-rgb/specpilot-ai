@@ -2,10 +2,10 @@ import Link from 'next/link';
 import { ArrowRight, Sparkles } from 'lucide-react';
 
 const prdSections = [
-  { name: 'MVP Scope', emoji: '🎯' },
-  { name: 'User Stories', emoji: '👤' },
-  { name: 'Technical Specs', emoji: '⚙️' },
-  { name: 'Data Model', emoji: '🗄️' },
+  { name: 'MVP Scope' },
+  { name: 'User Stories' },
+  { name: 'Technical Specs' },
+  { name: 'Data Model' },
 ];
 
 export function HeroSection() {
@@ -118,7 +118,6 @@ export function HeroSection() {
                           key={section.name}
                           className="flex items-center gap-3 rounded-lg border border-border/50 bg-muted/20 px-4 py-3"
                         >
-                          <span className="text-lg">{section.emoji}</span>
                           <span className="flex-1 text-sm font-medium text-foreground">
                             {section.name}
                           </span>
