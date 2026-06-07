@@ -1,23 +1,11 @@
 import { NextResponse } from "next/server";
-import { z } from "zod";
 import { prisma } from "@/lib/db/prisma";
-
-const answerSchema = z.object({
-  sessionId: z.string().uuid(),
-  projectId: z.string(),
-  sequenceNumber: z.number().int(),
-  stage: z.string(),
-  question: z.string(),
-  aiReason: z.string().optional(),
-  selectedOption: z.string(),
-  answerValue: z.string(),
-  completenessScore: z.number().int(),
-});
+import { interviewAnswerSchema } from "@/lib/validators/api";
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const result = answerSchema.safeParse(body);
+    const result = interviewAnswerSchema.safeParse(body);
 
     if (!result.success) {
       return NextResponse.json(
@@ -26,10 +14,28 @@ export async function POST(req: Request) {
       );
     }
 
-    const { sessionId, question, answerValue, sequenceNumber } = result.data;
+    const { sessionId, question, answerValue, sequenceNumber, selectedOption } = result.data;
+
+    if (process.env.NODE_ENV === "development") {
+      console.log("[InterviewAnswerAPI] Received answer:", {
+        selectedOption,
+        answerValue,
+        sequenceNumber,
+      });
+    }
 
     // Check mock mode
     if (process.env.AI_MODE === "mock" || !process.env.DATABASE_URL) {
+      if (process.env.NODE_ENV === "development") {
+        console.log("[InterviewAnswerAPI] Mock answer save:", {
+          selectedOption,
+          answerValue,
+          sequenceNumber,
+          answersLengthBeforeSave: 0,
+          answersLengthAfterSave: 1,
+        });
+      }
+
       return NextResponse.json({
         success: true,
       });
@@ -48,6 +54,8 @@ export async function POST(req: Request) {
       );
     }
 
+    const answersLengthBeforeSave = project.interviewAnswers.length;
+
     // Store answer
     await prisma.interviewAnswer.create({
       data: {
@@ -57,6 +65,16 @@ export async function POST(req: Request) {
         answer: answerValue,
       },
     });
+
+    if (process.env.NODE_ENV === "development") {
+      console.log("[InterviewAnswerAPI] Stored answer:", {
+        selectedOption,
+        answerValue,
+        sequenceNumber,
+        answersLengthBeforeSave,
+        answersLengthAfterSave: answersLengthBeforeSave + 1,
+      });
+    }
 
     return NextResponse.json({
       success: true,

@@ -23,9 +23,25 @@ export const interviewAnswerSchema = z.object({
   stage: z.string(),
   question: z.string(),
   aiReason: z.string().optional(),
-  selectedOption: z.string(),
-  answerValue: z.string(),
+  selectedOption: z.string().min(1),
+  answerValue: z.string().min(1),
   completenessScore: z.number().int().min(0).max(100),
+}).superRefine((data, ctx) => {
+  if (data.selectedOption === "custom" && data.answerValue.trim().length < 2) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["answerValue"],
+      message: "Custom answer must be at least 2 characters.",
+    });
+  }
+
+  if (data.answerValue.trim().length === 0) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["answerValue"],
+      message: "Answer value cannot be empty.",
+    });
+  }
 });
 
 export const generatePrdSchema = z.object({

@@ -172,6 +172,14 @@ function generateFallbackQuestion(answerCount: number, outputLanguage: OutputLan
   // Otherwise return the appropriate fallback question
   const fallback = fallbackQuestions[answerCount] || fallbackQuestions[fallbackQuestions.length - 1];
 
+  if (process.env.NODE_ENV === "development") {
+    console.log("[InterviewService] Next fallback stage selected:", {
+      answerCount,
+      answersLength: answerCount,
+      stage: fallback.stage,
+    });
+  }
+
   return {
     status: "asking",
     currentStage: fallback.stage,
@@ -233,6 +241,13 @@ export class InterviewService {
 
       const questionCount = project.interviewAnswers.length;
       const currentCompletenessScore = Math.min(100, questionCount * 10);
+
+      if (process.env.NODE_ENV === "development") {
+        console.log("[InterviewService] Generating next question:", {
+          answersLength: project.interviewAnswers.length,
+          questionCount,
+        });
+      }
 
       const previousAnswersJson = JSON.stringify(
         project.interviewAnswers.map((a) => ({

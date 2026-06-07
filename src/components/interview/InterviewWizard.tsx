@@ -85,42 +85,55 @@ export const InterviewWizard: React.FC = () => {
 
   const handleSubmit = async () => {
     if (!selectedOption || submitting || !currentQuestion) return;
-    
-    const textToSend = selectedOption === 'custom' ? customAnswer : selectedOption;
-    if (!textToSend.trim()) return;
+
+    const isCustomAnswer = selectedOption === 'custom';
+    const selectedPredefinedOption = currentQuestion.options.find(
+      (option) => option.value === selectedOption
+    );
+    const textToSend = isCustomAnswer
+      ? customAnswer.trim()
+      : selectedPredefinedOption?.label ?? "";
+
+    if (isCustomAnswer && textToSend.length < 2) {
+      setError("Custom answer must be at least 2 characters.");
+      return;
+    }
+
+    if (!textToSend) {
+      setError("Please select or enter an answer.");
+      return;
+    }
+
+    const selectedOptionToSend = isCustomAnswer ? 'custom' : selectedOption;
+    const sequenceNumber = answers.length + 1;
 
     setSubmitting(true);
     setError(null);
-    
+
     // Add assistant question and user answer to history for display
     const assistantMsg: InterviewMessage = { role: 'assistant', content: currentQuestion.question };
     const userMsg: InterviewMessage = { role: 'user', content: textToSend };
     const newHistory = [...history, assistantMsg, userMsg];
-    
-    setHistory(newHistory);
-    setSelectedOption(null);
-    setCustomAnswer("");
-
-    const optionIndex = currentQuestion.options.findIndex(o => o.label === selectedOption);
-    const mappedSelectedOption = optionIndex === 0 ? 'option_a' :
-                                  optionIndex === 1 ? 'option_b' :
-                                  optionIndex === 2 ? 'option_c' : 
-                                  optionIndex >= 0 ? `option_${optionIndex + 1}` : 'custom';
 
     const payload = {
       sessionId,
       projectId: sessionId,
-      sequenceNumber: Math.floor(history.length / 2) + 1,
+      sequenceNumber,
       stage: currentQuestion.currentStage || "discovery",
       question: currentQuestion.question,
       aiReason: currentQuestion.reason || "",
-      selectedOption: mappedSelectedOption,
+      selectedOption: selectedOptionToSend,
       answerValue: textToSend,
       completenessScore: currentQuestion.completenessScore || 10,
     };
 
     if (process.env.NODE_ENV === 'development') {
-      console.log('[InterviewWizard] Submitting answer:', payload);
+      console.log('[InterviewWizard] Submitting answer:', {
+        selectedOption: payload.selectedOption,
+        answerValue: payload.answerValue,
+        sequenceNumber: payload.sequenceNumber,
+        payload,
+      });
     }
 
     try {
@@ -132,13 +145,24 @@ export const InterviewWizard: React.FC = () => {
         stage: currentQuestion.currentStage,
         question: currentQuestion.question,
         answerValue: textToSend,
-        selectedOption: mappedSelectedOption,
+        selectedOption: selectedOptionToSend,
         completenessScore: currentQuestion.completenessScore || 10,
       };
-      setAnswers((prev) => [...prev, newAnswer]);
+
+      const nextAnswers = [...answers, newAnswer];
+      setAnswers(nextAnswers);
+      setHistory(newHistory);
+      setSelectedOption(null);
+      setCustomAnswer("");
 
       if (process.env.NODE_ENV === 'development') {
-        console.log('[InterviewWizard] Answer captured:', newAnswer);
+        console.log('[InterviewWizard] Answer captured:', {
+          selectedOption: newAnswer.selectedOption,
+          answerValue: newAnswer.answerValue,
+          sequenceNumber,
+          answersLengthBeforeSave: answers.length,
+          answersLengthAfterSave: nextAnswers.length,
+        });
       }
 
       // Get next question and trigger PRD generation
@@ -159,7 +183,7 @@ export const InterviewWizard: React.FC = () => {
       }
     } catch (err: any) {
       console.error("Submission failed", err);
-      setError("Failed to submit answer. Please try again.");
+      setError(err?.message || "Failed to submit answer. Please try again.");
     } finally {
       setSubmitting(false);
     }
@@ -239,8 +263,8 @@ export const InterviewWizard: React.FC = () => {
                         key={opt.value}
                         label={opt.label}
                         value={opt.value}
-                        selected={selectedOption === opt.label}
-                        onClick={() => handleOptionSelect(opt.label)}
+                        selected={selectedOption === opt.value}
+                        onClick={() => handleOptionSelect(opt.value)}
                       />
                     ))}
                     <AnswerOptionCard
@@ -283,11 +307,11 @@ export const InterviewWizard: React.FC = () => {
               {/* Continue Button */}
               <Button
                 onClick={handleSubmit}
-                disabled={
-                  submitting || 
-                  !selectedOption || 
-                  (selectedOption === 'custom' && !customAnswer.trim())
-                }
+                  disabled={
+                    submitting || 
+                    !selectedOption || 
+                    (selectedOption === 'custom' && customAnswer.trim().length < 2)
+                  }
                 className="w-full h-12 text-base font-medium bg-blue-600 hover:bg-blue-700 disabled:bg-zinc-300 disabled:text-zinc-500 shadow-sm"
               >
                 {submitting ? (
