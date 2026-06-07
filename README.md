@@ -108,3 +108,13 @@ All request bodies are validated with Zod. Invalid requests return consistent JS
 - **Database**: PostgreSQL
 - **AI**: Vercel AI SDK with multiple provider support
 - **Markdown Rendering**: react-markdown with Mermaid diagram support
+
+## Deployment Notes
+
+### Vercel Deployment
+
+Prompt markdown files are included in Vercel serverless functions via Next.js output file tracing (`outputFileTracingIncludes` in `next.config.mjs`).
+
+Runtime fallback prompts exist in `src/lib/prompts/fallback-prompts.ts` for production safety. If prompt files from `/docs` are unavailable at runtime, the system automatically falls back to embedded constants without crashing.
+
+This ensures the application remains resilient in serverless environments where file system access may be limited.
