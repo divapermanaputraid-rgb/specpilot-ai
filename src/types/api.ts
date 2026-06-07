@@ -1,6 +1,9 @@
+export type OutputLanguage = "id" | "en";
+
 export interface CreateProjectRequest {
   sessionId: string;
   rawIdea: string;
+  outputLanguage?: OutputLanguage;
 }
 
 export interface CreateProjectResponse {

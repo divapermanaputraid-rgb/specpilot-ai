@@ -3,6 +3,8 @@ import { AiMessage } from "../ai/types";
 import { loadPrdGenerationPrompt } from "../prompts/prompt-loader";
 import { validateVisualPrd, formatVisualPrd } from "../markdown/validate-visual-prd";
 
+type OutputLanguage = "id" | "en";
+
 export class PrdService {
   /**
    * Generates a PRD based on interview history
@@ -10,6 +12,7 @@ export class PrdService {
   async generatePrd(
     interviewHistory: AiMessage[],
     projectId: string,
+    outputLanguage: OutputLanguage = "id",
     retryFeedback?: string[]
   ): Promise<{ 
     content: string; 
@@ -24,7 +27,28 @@ export class PrdService {
   }> {
     try {
       // 1. Load comprehensive system prompt
-      const systemPrompt = await loadPrdGenerationPrompt();
+      const outputLanguageLabel = outputLanguage === "id" ? "Bahasa Indonesia" : "English";
+      const languageInstructions = outputLanguage === "id"
+        ? `Output language: Bahasa Indonesia
+
+Language rules:
+- Generate the full PRD in Bahasa Indonesia.
+- Keep technical terms readable and natural.
+- Markdown headings may be in Bahasa Indonesia.
+- Tables should use Bahasa Indonesia labels.
+- Mermaid diagram node labels should preferably use Bahasa Indonesia, but keep Mermaid syntax valid.
+- Code/API examples can remain technical English where appropriate.
+- AI Coding Agent Prompt should be in Bahasa Indonesia with technical terms preserved.`
+        : `Output language: English
+
+Language rules:
+- Generate the full PRD in English.
+- Use clear, professional product requirement writing.
+- Keep Markdown, Mermaid, code/API examples, and technical terms valid.`;
+
+      const systemPrompt = `${await loadPrdGenerationPrompt()}
+
+${languageInstructions}`;
 
       // 2. Prepare messages for AI
       // In a real app, we might summarize the interview history first to save tokens
@@ -32,7 +56,11 @@ export class PrdService {
         .map(m => `${m.role === 'user' ? 'User' : 'System'}: ${m.content}`)
         .join('\n\n');
 
-      let userPrompt = `Please generate a PRD based on the following interview history:\n\n${formattedHistory}`;
+      let userPrompt = `Output language: ${outputLanguageLabel}
+
+Please generate a PRD based on the following interview history:
+
+${formattedHistory}`;
 
       if (retryFeedback && retryFeedback.length > 0) {
         userPrompt += `\n\n---

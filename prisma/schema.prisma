@@ -19,6 +19,7 @@ model Project {
   id        String   @id @default(uuid())
   sessionId String   @unique
   rawIdea   String
+  outputLanguage String @default("id")
   status    ProjectStatus @default(DRAFT)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

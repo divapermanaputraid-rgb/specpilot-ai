@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { v4 as uuidv4 } from 'uuid';
-import { apiClient } from '@/lib/api-client';
+import { apiClient, type OutputLanguage } from '@/lib/api-client';
 import { ArrowRight, Loader2 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -17,6 +17,7 @@ export function IdeaInputForm() {
   const [idea, setIdea] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [outputLanguage, setOutputLanguage] = useState<OutputLanguage>('id');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,6 +31,7 @@ export function IdeaInputForm() {
       await apiClient.createProject({
         sessionId,
         rawIdea: idea,
+        outputLanguage,
       });
 
       router.push(`/app/session/${sessionId}`);
@@ -75,6 +77,28 @@ export function IdeaInputForm() {
               </div>
             </div>
           </div>
+        </div>
+
+
+        <div className="flex flex-col gap-2 rounded-2xl border border-border bg-muted/10 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <label htmlFor="output-language" className="text-sm font-semibold text-foreground/80">
+              Output language
+            </label>
+            <p className="mt-1 text-xs text-muted-foreground">
+              SpecPilot will ask questions and generate the PRD in this language.
+            </p>
+          </div>
+          <select
+            id="output-language"
+            value={outputLanguage}
+            onChange={(event) => setOutputLanguage(event.target.value as OutputLanguage)}
+            disabled={loading}
+            className="h-10 rounded-xl border border-border bg-background px-3 text-sm font-medium text-foreground outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:opacity-60"
+          >
+            <option value="id">Bahasa Indonesia</option>
+            <option value="en">English</option>
+          </select>
         </div>
 
         {error && (

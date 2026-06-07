@@ -1,3 +1,5 @@
+export type OutputLanguage = 'id' | 'en';
+
 export interface InterviewMessage {
   role: 'user' | 'assistant';
   content: string;
@@ -116,7 +118,7 @@ export async function generatePrd(sessionId: string): Promise<{ prd: string; qua
 }
 
 export const apiClient = {
-  async createProject(params: { sessionId: string; rawIdea: string }) {
+  async createProject(params: { sessionId: string; rawIdea: string; outputLanguage?: OutputLanguage }) {
     const res = await fetch(`${API_BASE}/project/create`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

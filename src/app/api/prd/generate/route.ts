@@ -42,9 +42,56 @@ export async function POST(req: Request) {
        }, { status: 404 });
     }
 
+    const outputLanguage = project.outputLanguage === "en" ? "en" : "id";
+
     // Check mock mode
     if (process.env.AI_MODE === "mock") {
-      const mockPrd = `# Mock PRD for Session ${sessionId}
+      const mockPrd = outputLanguage === "id"
+        ? `# Mock PRD untuk Sesi ${sessionId}
+
+## 1. Ringkasan Produk
+Ini adalah mock PRD yang dibuat karena sistem berjalan dalam mock mode atau API key AI belum tersedia.
+
+## 2. Mermaid Flowchart
+\`\`\`mermaid
+graph TD
+    A[Ide Pengguna] --> B{Mock Mode?};
+    B -- Ya --> C[Generate Mock PRD];
+    B -- Tidak --> D[Panggil AI];
+\`\`\`
+
+## 3. Mermaid ERD
+\`\`\`mermaid
+erDiagram
+    PROJECT ||--o{ INTERVIEW_ANSWER : contains
+    PROJECT ||--o| GENERATED_PRD : has
+\`\`\`
+
+## 4. Mermaid Gantt
+\`\`\`mermaid
+gantt
+    title Jadwal Mock Project
+    dateFormat  YYYY-MM-DD
+    section Implementasi
+    Setup           :a1, 2024-01-01, 7d
+    Fitur           :after a1, 14d
+\`\`\`
+
+## 5. Matriks Prioritas Fitur
+| Fitur | Dampak | Upaya | Prioritas |
+|---|---|---|---|
+| Aplikasi Inti | Tinggi | Sedang | P1 |
+| Mock Mode | Sedang | Rendah | P2 |
+
+## 6. Matriks Risiko
+| Risiko | Kemungkinan | Dampak | Mitigasi |
+|---|---|---|---|
+| API Key Tidak Tersedia | Tinggi | Tinggi | Gunakan fallback mock mode |
+
+## 7. Prompt AI Coding Agent
+Salin bagian ini ke AI coding agent untuk memulai implementasi.
+`
+        : `# Mock PRD for Session ${sessionId}
 
 ## 1. Product Overview
 This is a mock PRD generated because the system is in mock mode or AI keys are missing.
@@ -140,12 +187,12 @@ Copy and paste this section to an AI coding agent to start implementation.
 
     const validationMode = process.env.PRD_VALIDATION_MODE || 'warning';
 
-    let aiResponse = await prdService.generatePrd(interviewHistory, project.id);
+    let aiResponse = await prdService.generatePrd(interviewHistory, project.id, outputLanguage);
 
     // If validation fails, run one retry/regeneration attempt (unless mode is 'off')
     if (!aiResponse.isValid && validationMode !== 'off') {
       console.log(`[PRD] First attempt failed validation. Retrying with feedback...`);
-      aiResponse = await prdService.generatePrd(interviewHistory, project.id, aiResponse.validationErrors);
+      aiResponse = await prdService.generatePrd(interviewHistory, project.id, outputLanguage, aiResponse.validationErrors);
     }
 
     const quality = {

@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db/prisma";
 const createProjectSchema = z.object({
   sessionId: z.string().uuid(),
   rawIdea: z.string().min(20).max(2000),
+  outputLanguage: z.enum(["id", "en"]).optional().default("id"),
 });
 
 export async function POST(req: Request) {
@@ -19,10 +20,10 @@ export async function POST(req: Request) {
       );
     }
 
-    const { sessionId, rawIdea } = result.data;
+    const { sessionId, rawIdea, outputLanguage } = result.data;
 
-    // Check mock mode
-    if (process.env.AI_MODE === "mock" || !process.env.DATABASE_URL) {
+    // Allow mock provider mode to persist real project data when database is available.
+    if (!process.env.DATABASE_URL) {
       return NextResponse.json({
         success: true,
         projectId: "mock-project-id",
@@ -33,6 +34,7 @@ export async function POST(req: Request) {
       data: {
         sessionId,
         rawIdea,
+        outputLanguage,
         status: "INTERVIEWING",
       },
     });

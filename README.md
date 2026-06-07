@@ -16,7 +16,7 @@ SpecPilot AI turns rough product ideas into execution-ready visual Markdown PRDs
 
 **v0.1.0 MVP**
 
-This version includes the core idea input, guided interview flow, Markdown PRD generation, 9Router provider integration, and copy/download support.
+This version includes the core idea input, output language preference (`id` or `en`, default `id`), guided interview flow, Markdown PRD generation, 9Router provider integration, and copy/download support.
 
 ## Status
 
@@ -88,11 +88,14 @@ pnpm capture:screenshots    # Capture app screenshots (requires dev server runni
 - `POST /api/prd/generate`
 - `GET /api/prd/:session_id`
 
+`POST /api/project/create` accepts `outputLanguage: "id" | "en"` as an optional field. Default is Bahasa Indonesia (`"id"`). This preference controls AI interview questions, answer options, and generated PRD language.
+
 All request bodies are validated with Zod. Invalid requests return consistent JSON errors.
 
 ## Features
 
 - **AI-Guided Interview**: Interactive Q&A flow to understand your product vision
+- **Output Language Preference**: Choose Bahasa Indonesia (`id`, default) or English (`en`) before starting an interview
 - **Visual PRD Generation**: Comprehensive PRDs with Mermaid diagrams, user stories, and technical architecture
 - **Real-time Preview**: See your PRD build up as you answer questions
 - **Multiple AI Providers**: Support for Groq, OpenRouter, and Nine AI

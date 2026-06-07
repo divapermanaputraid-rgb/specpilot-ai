@@ -37,12 +37,22 @@ export class MockProvider implements AiProvider {
 
   private generateInterviewMock(messages: AiMessage[]): string {
     const userMessageCount = messages.filter((m) => m.role === "user").length;
+    const promptText = messages.map((message) => message.content).join("\n");
+    const outputLanguage = promptText.includes("Output language: Bahasa Indonesia") ? "id" : "en";
 
     let responseObj;
     if (userMessageCount >= 3) {
-      responseObj = {
-        status: 'ready_to_generate',
-        currentStage: 'Conclusion',
+      responseObj = outputLanguage === "id" ? {
+        status: "ready_to_generate",
+        currentStage: "Siap Generate",
+        question: "Konteks sudah cukup. Mau generate PRD sekarang?",
+        reason: "Konteks sudah cukup untuk membuat PRD.",
+        options: [],
+        allowCustom: false,
+        completenessScore: 100,
+      } : {
+        status: "ready_to_generate",
+        currentStage: "Conclusion",
         question: "Thank you, I have all the information I need to generate the PRD.",
         reason: "Sufficient context gathered.",
         options: [],
@@ -50,10 +60,25 @@ export class MockProvider implements AiProvider {
         completenessScore: 100,
       };
     } else {
-      responseObj = {
-        status: 'asking',
-        currentStage: userMessageCount === 0 ? 'Project Discovery' : 'Feature Definition',
-        question: userMessageCount === 0 
+      responseObj = outputLanguage === "id" ? {
+        status: "asking",
+        currentStage: userMessageCount === 0 ? "Target Pengguna" : "Ruang Lingkup MVP",
+        question: userMessageCount === 0
+          ? "Siapa pengguna utama produk ini?"
+          : "Kemampuan apa yang wajib masuk versi MVP pertama?",
+        reason: "Informasi ini dibutuhkan untuk menentukan alur utama dan prioritas MVP.",
+        options: [
+          { label: "Pengguna akhir / pelanggan", value: "end_users" },
+          { label: "Tim internal / admin", value: "internal_team" },
+          { label: "Keduanya", value: "both" },
+          { label: "Custom", value: "custom" }
+        ],
+        allowCustom: true,
+        completenessScore: Math.min(100, (userMessageCount + 1) * 25),
+      } : {
+        status: "asking",
+        currentStage: userMessageCount === 0 ? "Project Discovery" : "Feature Definition",
+        question: userMessageCount === 0
           ? "Welcome! Could you tell me more about the primary target audience for this project?"
           : "Could you tell me more about the specific features you want in your app?",
         reason: "Need to understand core audience and features to create a complete PRD.",

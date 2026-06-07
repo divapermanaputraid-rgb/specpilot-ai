@@ -3,6 +3,7 @@ import { z } from "zod";
 export const createProjectSchema = z.object({
   sessionId: z.string().uuid(),
   rawIdea: z.string().min(20).max(2000),
+  outputLanguage: z.enum(["id", "en"]).optional().default("id"),
 });
 
 export const interviewQuestionSchema = z.object({
